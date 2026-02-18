@@ -22,7 +22,8 @@ export default function cortex(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, _ctx) => {
 		const { hasKey, hasIndex } = await memory.init();
-		console.log(`[cortex] Memory initialized — API key: ${hasKey ? "✓" : "✗"}, index: ${hasIndex ? "✓" : "✗"}`);
+		const s = await memory.status();
+		console.log(`[cortex] Memory initialized — embeddings: ${s.embeddingModel}, index: ${hasIndex ? "✓" : "✗"}`);
 
 		// Auto-reindex on first boot or if index is missing
 		if (hasKey && !hasIndex) {
@@ -432,7 +433,7 @@ export default function cortex(pi: ExtensionAPI) {
 					const s = await memory.status();
 					emitCommandFeedback(
 						ctx,
-						`Key: ${s.hasKey ? "✓" : "✗"} | Index: ${s.hasIndex ? "✓" : "✗"} | ${s.coreFiles} core, ${s.dailyFiles} daily | ${s.embeddingModel}`,
+						`Embeddings: ${s.embeddingModel} | Index: ${s.hasIndex ? "✓" : "✗"} | ${s.coreFiles} core, ${s.dailyFiles} daily`,
 						"info",
 					);
 				} else {
