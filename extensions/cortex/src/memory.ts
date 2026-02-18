@@ -4,6 +4,7 @@ import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { LocalIndex } from "vectra";
 import { glob } from "glob";
+import { pipeline, type FeatureExtractionPipeline } from "@xenova/transformers";
 import { rerank as rerankResults, isRerankerAvailable } from "./rerank.js";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
@@ -14,8 +15,10 @@ const CORTEX_DIR = join(MEMORY_DIR, "cortex");
 const INDEX_DIR = join(CORTEX_DIR, "vectors");
 const DAILY_DIR = join(MEMORY_DIR, "daily");
 const ENV_FILE = join(HOME, ".pi", ".env");
+const MODEL_CACHE_DIR = join(HOME, ".cache", "pi-cortex", "models");
 
-const EMBEDDING_MODEL = "gemini-embedding-001";
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const LOCAL_EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,9 @@ interface ItemMetadata {
 // ── State ──────────────────────────────────────────────────────────────────
 
 let geminiKey: string | null = null;
+let embeddingPipeline: FeatureExtractionPipeline | null = null;
+let embeddingLoadPromise: Promise<FeatureExtractionPipeline> | null = null;
+let usingLocalEmbeddings = false;
 let index: LocalIndex | null = null;
 let initialized = false;
 
@@ -47,7 +53,7 @@ let initialized = false;
 export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 	if (initialized) {
 		return {
-			hasKey: !!geminiKey,
+			hasKey: !!geminiKey || usingLocalEmbeddings,
 			hasIndex: index ? await index.isIndexCreated() : false,
 		};
 	}
@@ -57,8 +63,12 @@ export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 		if (!existsSync(dir)) await mkdir(dir, { recursive: true });
 	}
 
-	// Load API key
+	// Load API key — fall back to local embeddings if unavailable
 	geminiKey = loadGeminiKey();
+	if (!geminiKey) {
+		console.log(`[cortex/memory] No GEMINI_API_KEY found, using local embeddings (${LOCAL_EMBEDDING_MODEL})`);
+		usingLocalEmbeddings = true;
+	}
 
 	// Init vector index
 	index = new LocalIndex(INDEX_DIR);
@@ -66,7 +76,7 @@ export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 	initialized = true;
 
 	return {
-		hasKey: !!geminiKey,
+		hasKey: !!geminiKey || usingLocalEmbeddings,
 		hasIndex: await index.isIndexCreated(),
 	};
 }
@@ -90,10 +100,10 @@ function loadGeminiKey(): string | null {
 
 // ── Embeddings ─────────────────────────────────────────────────────────────
 
-async function getEmbedding(text: string): Promise<number[] | null> {
+async function getGeminiEmbedding(text: string): Promise<number[] | null> {
 	if (!geminiKey) return null;
 
-	const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent?key=${geminiKey}`;
+	const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${geminiKey}`;
 
 	const res = await fetch(url, {
 		method: "POST",
@@ -109,6 +119,61 @@ async function getEmbedding(text: string): Promise<number[] | null> {
 	const data = (await res.json()) as { embedding?: { values?: number[] } };
 	if (data.embedding?.values) return data.embedding.values;
 	throw new Error("Invalid embedding response");
+}
+
+async function loadLocalEmbeddingModel(): Promise<FeatureExtractionPipeline> {
+	if (embeddingPipeline) return embeddingPipeline;
+	if (embeddingLoadPromise) return embeddingLoadPromise;
+
+	embeddingLoadPromise = (async () => {
+		if (!existsSync(MODEL_CACHE_DIR)) {
+			await mkdir(MODEL_CACHE_DIR, { recursive: true });
+		}
+
+		console.log(`[cortex/memory] Loading local embedding model: ${LOCAL_EMBEDDING_MODEL}...`);
+
+		const pipe = await pipeline("feature-extraction", LOCAL_EMBEDDING_MODEL, {
+			cache_dir: MODEL_CACHE_DIR,
+			quantized: true,
+		});
+
+		embeddingPipeline = pipe;
+		console.log(`[cortex/memory] Local embedding model loaded: ${LOCAL_EMBEDDING_MODEL}`);
+		return pipe;
+	})();
+
+	try {
+		return await embeddingLoadPromise;
+	} catch (e) {
+		embeddingLoadPromise = null;
+		throw e;
+	}
+}
+
+async function getLocalEmbedding(text: string): Promise<number[] | null> {
+	try {
+		const pipe = await loadLocalEmbeddingModel();
+		const truncated = text.slice(0, 512);
+		const result = await pipe(truncated, { pooling: "mean", normalize: true });
+		return Array.from(result.data as Float32Array);
+	} catch (e) {
+		console.error(`[cortex/memory] Local embedding failed: ${(e as Error).message}`);
+		return null;
+	}
+}
+
+async function getEmbedding(text: string): Promise<number[] | null> {
+	// Primary: Gemini API
+	if (geminiKey) {
+		try {
+			return await getGeminiEmbedding(text);
+		} catch (e) {
+			console.error(`[cortex/memory] Gemini embedding failed: ${(e as Error).message}, falling back to local`);
+		}
+	}
+
+	// Fallback: local model
+	return getLocalEmbedding(text);
 }
 
 // ── Keyword Search (BM25-lite fallback) ────────────────────────────────────
@@ -270,7 +335,7 @@ async function addToIndex(text: string, metadata: ItemMetadata): Promise<void> {
 
 	try {
 		const vector = await getEmbedding(text);
-		if (!vector) return; // No API key — skip silently
+		if (!vector) return; // No embedding available — skip silently
 		await index.insertItem({ vector, metadata });
 	} catch (e) {
 		console.error(`[cortex/memory] Index insert failed: ${(e as Error).message}`);
@@ -283,8 +348,9 @@ async function addToIndex(text: string, metadata: ItemMetadata): Promise<void> {
 export async function reindex(): Promise<{ totalChunks: number; files: string[] }> {
 	await init();
 
+	// Ensure we can produce embeddings (local model if no Gemini key)
 	if (!geminiKey) {
-		throw new Error("No GEMINI_API_KEY found. Set it in ~/.pi/.env or environment.");
+		await loadLocalEmbeddingModel();
 	}
 
 	// Clear and recreate
@@ -346,9 +412,9 @@ export async function status(): Promise<{
 	const dailyFiles = (await glob(join(DAILY_DIR, "*.md"))).length;
 
 	return {
-		hasKey: !!geminiKey,
+		hasKey: !!geminiKey || usingLocalEmbeddings,
 		hasIndex: index ? await index.isIndexCreated() : false,
-		embeddingModel: EMBEDDING_MODEL,
+		embeddingModel: geminiKey ? GEMINI_EMBEDDING_MODEL : `${LOCAL_EMBEDDING_MODEL} (local)`,
 		memoryDir: MEMORY_DIR,
 		coreFiles,
 		dailyFiles,
