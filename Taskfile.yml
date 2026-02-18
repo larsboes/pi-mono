@@ -1,0 +1,204 @@
+# Taskfile.yml - Common tasks for pi-mono project
+# Install task runner: brew install go-task/tap/go-task
+# Or visit: https://taskfile.dev
+
+version: '3'
+
+vars:
+  SKILLS_DIR: "./skills"
+  SCRIPTS_DIR: "./scripts"
+
+env:
+  PI_SKILLS_DIR: "$HOME/.pi/skills"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ========== Installation ==========
+  
+  install:
+    desc: Install all skills to ~/.pi/skills/
+    cmds:
+      - "{{.SCRIPTS_DIR}}/install-skills.sh"
+  
+  install:skill:
+    desc: Install a specific skill (e.g., task install:skill -- github)
+    cmds:
+      - "{{.SCRIPTS_DIR}}/install-skills.sh {{.CLI_ARGS}}"
+  
+  install:check:
+    desc: Preview installation without making changes
+    cmds:
+      - "{{.SCRIPTS_DIR}}/install-skills.sh --dry-run"
+  
+  install:list:
+    desc: List all available skills
+    cmds:
+      - "{{.SCRIPTS_DIR}}/install-skills.sh --list"
+
+  # ========== Skills Management ==========
+  
+  skills:list:
+    desc: List installed vs available skills
+    cmds:
+      - |
+        echo "Available in repo:"
+        ls -1 {{.SKILLS_DIR}} | wc -l
+        echo ""
+        echo "Installed in ~/.pi/skills/:"
+        ls -1 ~/.pi/skills/ 2>/dev/null | wc -l || echo "0 (directory not found)"
+  
+  skills:diff:
+    desc: Show skills that differ between repo and local
+    cmds:
+      - |
+        echo "Skills in repo but not in ~/.pi/skills/:"
+        comm -23 <(ls -1 {{.SKILLS_DIR}} | sort) <(ls -1 ~/.pi/skills/ 2>/dev/null | sort)
+        echo ""
+        echo "Skills in ~/.pi/skills/ but not in repo:"
+        comm -13 <(ls -1 {{.SKILLS_DIR}} | sort) <(ls -1 ~/.pi/skills/ 2>/dev/null | sort)
+
+  # ========== Validation ==========
+  
+  validate:
+    desc: Validate all skills have required files
+    cmds:
+      - |
+        echo "Validating skills..."
+        errors=0
+        for skill_dir in {{.SKILLS_DIR}}/*/; do
+          skill=$(basename "$skill_dir")
+          if [[ ! -f "$skill_dir/SKILL.md" ]]; then
+            echo "  ✗ $skill: Missing SKILL.md"
+            ((errors++))
+          else
+            # Check for frontmatter
+            if ! head -5 "$skill_dir/SKILL.md" | grep -q "^---"; then
+              echo "  ⚠ $skill: Missing YAML frontmatter"
+            fi
+            # Check for description
+            if ! head -10 "$skill_dir/SKILL.md" | grep -q "^description:"; then
+              echo "  ⚠ $skill: Missing description in frontmatter"
+            fi
+          fi
+        done
+        if [[ $errors -eq 0 ]]; then
+          echo "✓ All skills validated"
+        else
+          echo "✗ $errors skill(s) have errors"
+          exit 1
+        fi
+
+  validate:pii:
+    desc: Scan for potential PII in public skills
+    cmds:
+      - |
+        echo "Scanning for PII..."
+        issues=0
+        
+        # Check for absolute paths
+        if grep -rE "/Users/[a-z]+" {{.SKILLS_DIR}} --include="*.md" 2>/dev/null | grep -v "example"; then
+          echo "  ✗ Found absolute user paths"
+          ((issues++))
+        fi
+        
+        # Check for personal names (add your patterns here)
+        if grep -riE "lars.*boes|franzi|ahrtal" {{.SKILLS_DIR}} --include="*.md" 2>/dev/null; then
+          echo "  ✗ Found personal references"
+          ((issues++))
+        fi
+        
+        if [[ $issues -eq 0 ]]; then
+          echo "✓ No obvious PII found"
+        else
+          echo "⚠ Found $issues potential issue(s)"
+        fi
+
+  # ========== Git Operations ==========
+  
+  git:status:
+    desc: Check git status of skills directory
+    cmds:
+      - git status {{.SKILLS_DIR}}
+  
+  git:add:
+    desc: Stage all skill changes
+    cmds:
+      - git add {{.SKILLS_DIR}}
+      - git status
+
+  # ========== Maintenance ==========
+  
+  stats:
+    desc: Show repository statistics
+    cmds:
+      - |
+        echo "═══════════════════════════════════════════════════"
+        echo "  PI-MONO REPOSITORY STATS"
+        echo "═══════════════════════════════════════════════════"
+        echo ""
+        echo "Skills:"
+        echo "  Total: $(ls -1 {{.SKILLS_DIR}} | wc -l)"
+        echo "  Size: $(du -sh {{.SKILLS_DIR}} | cut -f1)"
+        echo ""
+        echo "Top 10 largest skills:"
+        du -sh {{.SKILLS_DIR}}/*/ | sort -hr | head -10 | nl
+        echo ""
+        echo "Recent commits:"
+        git log --oneline -5
+
+  clean:
+    desc: Clean temporary files
+    cmds:
+      - find {{.SKILLS_DIR}} -name ".DS_Store" -delete
+      - find {{.SKILLS_DIR}} -name "*.tmp" -delete
+      - echo "✓ Cleaned temporary files"
+
+  # ========== Development ==========
+  
+  dev:watch:
+    desc: Watch for skill changes and auto-sync to local pi
+    cmds:
+      - |
+        echo "Watching for changes in {{.SKILLS_DIR}}..."
+        echo "Press Ctrl+C to stop"
+        fswatch -o {{.SKILLS_DIR}} | while read f; do
+          echo "Changes detected, syncing..."
+          task install
+        done
+    preconditions:
+      - sh: "which fswatch"
+        msg: "fswatch not installed. Run: brew install fswatch"
+
+  # ========== Help ==========
+  
+  help:
+    desc: Show help for new contributors
+    cmds:
+      - |
+        echo "═══════════════════════════════════════════════════"
+        echo "  PI-MONO - Community Skills for pi"
+        echo "═══════════════════════════════════════════════════"
+        echo ""
+        echo "Quick start:"
+        echo "  1. task install         # Install all skills to ~/.pi/skills/"
+        echo "  2. task skills:list     # See what's installed"
+        echo "  3. task validate        # Check skills are valid"
+        echo ""
+        echo "For users:"
+        echo "  task install            # Install all skills"
+        echo "  task install:skill -- <name>  # Install specific skill"
+        echo "  task install:list       # List available skills"
+        echo ""
+        echo "For contributors:"
+        echo "  task validate           # Validate skill structure"
+        echo "  task validate:pii       # Check for personal info"
+        echo "  task stats              # Show repo statistics"
+        echo "  task git:add            # Stage changes"
+        echo ""
+        echo "For development:"
+        echo "  task dev:watch          # Auto-sync on file changes"
+        echo "  task clean              # Remove temp files"

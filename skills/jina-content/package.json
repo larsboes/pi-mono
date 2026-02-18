@@ -1,0 +1,9 @@
+{
+	"name": "jina-content",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "Free web content extraction via Jina AI Reader - no API key required",
+	"author": "Mario Zechner",
+	"license": "MIT",
+	"dependencies": {}
+}

@@ -1,0 +1,69 @@
+# Claude Code Adapter
+# Transforms pi skills for Claude Code compatibility
+
+platform: claude-code
+target_dir: ~/.claude/skills
+
+# Tool name mappings (pi -> claude)
+# Claude uses PascalCase, same as pi's tool names in practice
+tool_mapping:
+  bash: Bash
+  read: Read
+  edit: Edit
+  write: Write
+  # Claude has these as well
+  # But pi has custom tools Claude doesn't:
+
+# Tools that exist in pi but NOT in Claude Code
+unsupported_tools:
+  - memory_search:
+      action: warn
+      message: "Claude Code has no memory_search. Skill should work without it or use alternatives."
+  - memory_store:
+      action: warn
+      message: "Claude Code has no memory_store. Skill should work without it or use alternatives."
+  - send_to_session:
+      action: remove
+      message: "send_to_session is pi-specific. Remove references or make optional."
+  - list_sessions:
+      action: remove
+      message: "list_sessions is pi-specific. Remove references or make optional."
+  - crystallize_skill:
+      action: remove
+      message: "crystallize_skill is pi-specific. Remove references or make optional."
+  - capabilities_query:
+      action: remove
+      message: "capabilities_query is pi-specific. Remove references or make optional."
+  - memory_manager:
+      action: warn
+      message: "memory_manager tool is pi-specific. Skill references should be optional."
+
+# Path pattern transformations
+path_patterns:
+  "{baseDir}/": "./"
+  "~/.pi/": "~/.claude/"
+
+# Header to add to synced skills
+header_injection: |
+  <!--
+  SYNCED FROM: ~/.pi/skills/
+  TARGET: ~/.claude/skills/
+  
+  This skill was automatically synced from pi. Some features may not be available:
+  - No memory system (memory_search, memory_store)
+  - No session management (send_to_session, list_sessions)
+  - No skill crystallization (crystallize_skill)
+  
+  Last synced: {{timestamp}}
+  -->
+
+# Transformations to apply
+transformations:
+  - name: fix_tool_references
+    description: "Update tool name references to Claude equivalents"
+  - name: remove_unsupported_examples
+    description: "Remove examples using unsupported tools"
+  - name: add_sync_header
+    description: "Add sync metadata header"
+  - name: update_paths
+    description: "Update path references for Claude environment"

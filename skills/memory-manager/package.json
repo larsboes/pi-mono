@@ -1,0 +1,17 @@
+{
+  "name": "pi-memory-manager",
+  "version": "1.0.0",
+  "description": "Semantic memory skill for pi — uses pi's Google auth for embeddings, keyword fallback",
+  "type": "module",
+  "bin": {
+    "memory": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js"
+  },
+  "dependencies": {
+    "vectra": "^0.3.0",
+    "yargs": "^17.7.2",
+    "glob": "^10.3.10"
+  }
+}

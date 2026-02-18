@@ -1,0 +1,76 @@
+# Antigravity Adapter
+# Transforms pi skills for Google Antigravity compatibility
+
+platform: antigravity
+target_dir: ~/.gemini/antigravity/skills
+
+# Tool name mappings (pi -> antigravity)
+# TODO: Research actual Antigravity tool names
+tool_mapping:
+  bash: bash  # Assuming same, verify
+  read: read  # Assuming same, verify
+  edit: edit  # Assuming same, verify
+  write: write  # Assuming same, verify
+
+# Tools - Antigravity HAS memory, so these might translate
+translatable_tools:
+  memory_search:
+    target: memory_search  # Verify actual name
+    note: "Antigravity has memory capabilities - verify API compatibility"
+  memory_store:
+    target: memory_store  # Verify actual name
+    note: "Antigravity has memory capabilities - verify API compatibility"
+
+# Tools that likely don't exist in Antigravity
+unsupported_tools:
+  - send_to_session:
+      action: warn
+      message: "send_to_session is pi-specific. Verify if Antigravity has equivalent."
+  - list_sessions:
+      action: warn
+      message: "list_sessions is pi-specific. Verify if Antigravity has equivalent."
+  - crystallize_skill:
+      action: warn
+      message: "crystallize_skill is pi-specific. Verify if Antigravity has equivalent."
+  - capabilities_query:
+      action: warn
+      message: "capabilities_query is pi-specific. Verify if Antigravity has equivalent."
+
+# Path pattern transformations
+path_patterns:
+  "{baseDir}/": "./"
+  "~/.pi/": "~/.gemini/antigravity/"
+
+# Header to add to synced skills
+header_injection: |
+  <!--
+  SYNCED FROM: ~/.pi/skills/
+  TARGET: ~/.gemini/antigravity/skills/
+  
+  This skill was automatically synced from pi to Antigravity.
+  
+  Platform differences to note:
+  - Antigravity has native memory (unlike Claude)
+  - Tool names may differ - verify examples work
+  - Session management may differ
+  
+  TODO: Verify tool names match Antigravity's actual tool names
+  
+  Last synced: {{timestamp}}
+  -->
+
+# Transformations to apply
+transformations:
+  - name: fix_tool_references
+    description: "Update tool name references (verify Antigravity naming)"
+  - name: add_sync_header
+    description: "Add sync metadata header with TODOs"
+  - name: update_paths
+    description: "Update path references for Antigravity environment"
+
+# Research notes
+research_needed:
+  - "Actual Antigravity tool names (bash vs Bash, etc.)"
+  - "Antigravity memory API specifics"
+  - "Antigravity session management capabilities"
+  - "Script execution patterns in Antigravity"

@@ -1,0 +1,27 @@
+{
+  "name": "pi-pptx-skill",
+  "version": "2.0.0",
+  "description": "Next-generation PowerPoint generation with Content-First workflow, Auto-Layout Engine, and Vault-Templates",
+  "main": "lib/cli.js",
+  "bin": {
+    "pptx": "./lib/cli.js"
+  },
+  "scripts": {
+    "test": "node tests/test.js",
+    "build": "node lib/cli.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0",
+    "js-yaml": "^4.1.0"
+  },
+  "keywords": [
+    "pptx",
+    "powerpoint",
+    "presentations",
+    "markdown",
+    "design-system",
+    "auto-layout"
+  ],
+  "author": "Lars Boes",
+  "license": "MIT"
+}

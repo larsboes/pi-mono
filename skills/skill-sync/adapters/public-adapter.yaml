@@ -1,0 +1,155 @@
+# Public Repository Adapter
+# Transforms pi skills for public/community release
+
+platform: public
+target_dir: ~/Developer/pi-mono/skills
+
+# Purpose: Community skills without personal data
+# This is for giving back - clean, generic, reusable skills
+
+# Tool name mappings - keep as-is (pi names are the reference)
+tool_mapping: {}  # No mapping needed, pi names are canonical
+
+# All tools are supported (public skills should work in pi)
+unsupported_tools: {}
+
+# PII Patterns to remove/replace
+pii_patterns:
+  # Personal paths
+  - pattern: "~/"
+    replacement: "~/"
+    description: "Replace absolute home path with ~"
+  
+  - pattern: "{{username}}"
+    replacement: "{{username}}"
+    description: "Replace username placeholder"
+  
+  # Personal references  
+  - pattern: "{{author}}"
+    replacement: "{{author}}"
+    description: "Replace author name"
+  
+  # Company references (specific to DT should be generalized)
+  - pattern: "{{company}}"
+    replacement: "{{company}}"
+    flags: optional  # Some skills might legitimately mention telecom
+    description: "Replace company name (review case-by-case)"
+  
+  - pattern: "DT internal"
+    replacement: "your organization"
+    description: "Generalize internal references"
+
+# API Keys and Secrets patterns
+secret_patterns:
+  - pattern: "API_KEY.*=.*['\"][a-zA-Z0-9_-]+['\"]"
+    replacement: "API_KEY = '{{YOUR_API_KEY}}'"
+    description: "Replace hardcoded API keys with placeholder"
+  
+  - pattern: "token.*=.*['\"][a-zA-Z0-9_-]+['\"]"
+    replacement: "token = '{{YOUR_TOKEN}}'"
+    flags: review
+    description: "Replace tokens with placeholder (review if example)"
+  
+  - pattern: "password.*=.*['\"].+['\"]"
+    replacement: "password = '{{YOUR_PASSWORD}}'"
+    description: "Replace passwords with placeholder"
+
+# Content to strip/replace
+content_cleanup:
+  # Remove internal todos
+  - pattern: "TODO.*internal.*"
+    action: remove_line
+    description: "Remove internal-only todos"
+  
+  - pattern: "FIXME.*personal.*"
+    action: remove_line
+    description: "Remove personal fixmes"
+  
+  # Remove personal notes
+  - pattern: "<!-- personal:.*-->"
+    action: remove
+    description: "Remove personal HTML comments"
+  
+  - pattern: "# personal:.*"
+    action: remove_line
+    description: "Remove personal markdown comments"
+
+# Files to exclude from public sync
+exclude_files:
+  - ".DS_Store"
+  - "*.log"
+  - "personal-*"
+  - ".env*"
+  - "secrets.yaml"
+  - "config.personal.yaml"
+
+# Required additions
+required_additions:
+  license_header: |
+    <!--
+    License: MIT
+    Author: {{original_author}}
+    Source: https://github.com/larsboes/pi-mono
+    
+    This skill is part of the pi-mono community skills collection.
+    Contribute improvements via GitHub issues or PRs.
+    -->
+  
+  contributing_note: |
+    ## Contributing
+    
+    Found an issue or have an improvement? 
+    - Open an issue: https://github.com/larsboes/pi-mono/issues
+    - Submit a PR: https://github.com/larsboes/pi-mono/pulls
+
+# Header to add to public skills
+header_injection: |
+  <!--
+  🌐 COMMUNITY SKILL
+  
+  Part of the pi-mono open skills collection.
+  - Repository: https://github.com/larsboes/pi-mono
+  - License: MIT
+  - Maintained by: {{author}} and contributors
+  
+  Originally developed in pi, ported for community use.
+  
+  Last synced: {{timestamp}}
+  -->
+
+# Transformations to apply
+transformations:
+  - name: remove_pii
+    description: "Remove personal identifiable information"
+  - name: remove_secrets
+    description: "Replace secrets with placeholders"
+  - name: add_license_header
+    description: "Add MIT license header"
+  - name: add_contributing_section
+    description: "Add contributing guidelines"
+  - name: generalize_examples
+    description: "Generalize personal examples"
+  - name: add_sync_header
+    description: "Add community skill header"
+
+# Validation rules
+validation:
+  no_absolute_paths:
+    pattern: "/Users/"
+    severity: error
+    message: "Absolute user paths found - must use ~/ or relative paths"
+  
+  no_api_keys:
+    pattern: "(api_key|token|password)\s*=\s*['\"][^'\"]+['\"]"
+    severity: error
+    message: "Hardcoded credentials found - use placeholders"
+  
+  no_personal_refs:
+    pattern: "{{username}}|{{author}}"
+    severity: error
+    message: "Personal name references found - generalize"
+  
+  has_license:
+    pattern: "License:"
+    severity: error
+    message: "Missing license header"
