@@ -1,0 +1,26 @@
+{
+  "name": "@larsboes/pi-mitsupi",
+  "version": "1.0.0",
+  "description": "Personal pi extensions (adapted from agent-stuff)",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-agent-core": "file:../pi-mono/packages/agent",
+    "@mariozechner/pi-ai": "file:../pi-mono/packages/ai",
+    "@mariozechner/pi-coding-agent": "file:../pi-mono/packages/coding-agent",
+    "@mariozechner/pi-tui": "file:../pi-mono/packages/tui",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48"
+  }
+}

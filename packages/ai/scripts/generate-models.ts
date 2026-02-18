@@ -53,6 +53,11 @@ const COPILOT_STATIC_HEADERS = {
 	"Copilot-Integration-Id": "vscode-chat",
 } as const;
 
+const KIMI_CODING_STATIC_HEADERS = {
+	"User-Agent": "kimi-cli/1.0.0 (external, cli)",
+	"X-Msh-Platform": "kimi_cli",
+} as const;
+
 const AI_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1";
 const AI_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh";
 
@@ -608,6 +613,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					provider: "kimi-coding",
 					// Kimi For Coding's Anthropic-compatible API - SDK appends /v1/messages
 					baseUrl: "https://api.kimi.com/coding",
+					headers: { ...KIMI_CODING_STATIC_HEADERS },
 					reasoning: m.reasoning === true,
 					input: m.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
 					cost: {
@@ -1255,6 +1261,7 @@ async function generateModels() {
 			api: "anthropic-messages",
 			provider: "kimi-coding",
 			baseUrl: KIMI_CODING_BASE_URL,
+			headers: { ...KIMI_CODING_STATIC_HEADERS },
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1267,6 +1274,7 @@ async function generateModels() {
 			api: "anthropic-messages",
 			provider: "kimi-coding",
 			baseUrl: KIMI_CODING_BASE_URL,
+			headers: { ...KIMI_CODING_STATIC_HEADERS },
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1280,6 +1288,72 @@ async function generateModels() {
 			allModels.push(model);
 		}
 	}
+
+	// Moonshot AI models (OpenAI-compatible)
+	const MOONSHOT_BASE_URL = "https://api.moonshot.cn/v1";
+	const moonshotModels: Model<"openai-completions">[] = [
+		{
+			id: "moonshot-v1-8k",
+			name: "Moonshot v1 8k",
+			api: "openai-completions",
+			provider: "moonshot",
+			baseUrl: MOONSHOT_BASE_URL,
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 12, output: 12, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 8192,
+			maxTokens: 4096,
+		},
+		{
+			id: "moonshot-v1-32k",
+			name: "Moonshot v1 32k",
+			api: "openai-completions",
+			provider: "moonshot",
+			baseUrl: MOONSHOT_BASE_URL,
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 24, output: 24, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 32768,
+			maxTokens: 8192,
+		},
+		{
+			id: "moonshot-v1-128k",
+			name: "Moonshot v1 128k",
+			api: "openai-completions",
+			provider: "moonshot",
+			baseUrl: MOONSHOT_BASE_URL,
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 60, output: 60, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128000,
+			maxTokens: 16384,
+		},
+		{
+			id: "kimi-latest",
+			name: "Kimi Latest",
+			api: "openai-completions",
+			provider: "moonshot",
+			baseUrl: MOONSHOT_BASE_URL,
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128000,
+			maxTokens: 16384,
+		},
+		{
+			id: "kimi-k2.5",
+			name: "Kimi K2.5",
+			api: "openai-completions",
+			provider: "moonshot",
+			baseUrl: MOONSHOT_BASE_URL,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 262144,
+			maxTokens: 32768,
+		},
+	];
+	allModels.push(...moonshotModels);
 
 	const azureOpenAiModels: Model<Api>[] = allModels
 		.filter((model) => model.provider === "openai" && model.api === "openai-responses")
