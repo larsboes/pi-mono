@@ -1018,6 +1018,18 @@ async function generateModels() {
 			contextWindow: 1048576,
 			maxTokens: 65535,
 		},
+		{
+			id: "gemini-3.1-pro-preview",
+			name: "Gemini 3.1 Pro Preview (Cloud Code Assist)",
+			api: "google-gemini-cli",
+			provider: "google-gemini-cli",
+			baseUrl: CLOUD_CODE_ASSIST_ENDPOINT,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 1048576,
+			maxTokens: 65535,
+		},
 	];
 	allModels.push(...cloudCodeAssistModels);
 
@@ -1100,6 +1112,18 @@ async function generateModels() {
 			maxTokens: 64000,
 		},
 		{
+			id: "claude-opus-4-6-thinking",
+			name: "Claude Opus 4.6 Thinking (Antigravity)",
+			api: "google-gemini-cli",
+			provider: "google-antigravity",
+			baseUrl: ANTIGRAVITY_ENDPOINT,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+			contextWindow: 200000,
+			maxTokens: 128000,
+		},
+		{
 			id: "gpt-oss-120b-medium",
 			name: "GPT-OSS 120B Medium (Antigravity)",
 			api: "google-gemini-cli",
@@ -1127,6 +1151,18 @@ async function generateModels() {
 			cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
 			contextWindow: 1000000,
 			maxTokens: 64000,
+		},
+		{
+			id: "gemini-3.1-pro-preview",
+			name: "Gemini 3.1 Pro Preview (Vertex)",
+			api: "google-vertex",
+			provider: "google-vertex",
+			baseUrl: VERTEX_BASE_URL,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
+			contextWindow: 1048576,
+			maxTokens: 65536,
 		},
 		{
 			id: "gemini-3-flash-preview",
