@@ -22,7 +22,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `protected-paths.ts` | Blocks writes to protected paths (.env, .git/, node_modules/) |
 | `confirm-destructive.ts` | Confirms before destructive session actions (clear, switch, fork) |
 | `dirty-repo-guard.ts` | Prevents session changes with uncommitted git changes |
-| `sandbox/` | OS-level sandboxing using `@anthropic-ai/sandbox-runtime` with per-project config |
+| `sandbox/` | OS-level sandboxing with per-project config |
 
 ### Custom Tools
 
@@ -118,8 +118,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 
 | Extension | Description |
 |-----------|-------------|
-| `custom-provider-anthropic/` | Custom Anthropic provider with OAuth support and custom streaming implementation |
-| `custom-provider-gitlab-duo/` | GitLab Duo provider using pi-ai's built-in Anthropic/OpenAI streaming via proxy |
+| `custom-provider-gitlab-duo/` | GitLab Duo provider using pi-ai's built-in OpenAI streaming via proxy |
 | `custom-provider-qwen-cli/` | Qwen CLI provider with OAuth device flow and OpenAI-compatible models |
 
 ### External Dependencies
