@@ -9,9 +9,6 @@
  * - Antigravity (Gemini 3, Claude, GPT-OSS via Google Cloud)
  */
 
-// Set up HTTP proxy for fetch() calls (respects HTTP_PROXY, HTTPS_PROXY env vars)
-import "../http-proxy.js";
-
 // Anthropic
 export { anthropicOAuthProvider, loginAnthropic, refreshAnthropicToken } from "./anthropic.js";
 // GitHub Copilot
@@ -27,7 +24,7 @@ export { antigravityOAuthProvider, loginAntigravity, refreshAntigravityToken } f
 // Google Gemini CLI
 export { geminiCliOAuthProvider, loginGeminiCli, refreshGoogleCloudToken } from "./google-gemini-cli.js";
 // Kimi Code
-export { kimiCodeOAuthProvider, loginKimiCode, refreshKimiCodeToken } from "./kimi-code.js";
+export { kimiCodeOAuthProvider, loginKimiCode } from "./kimi-code.js";
 // OpenAI Codex (ChatGPT OAuth)
 export { loginOpenAICodex, openaiCodexOAuthProvider, refreshOpenAICodexToken } from "./openai-codex.js";
 

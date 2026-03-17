@@ -4,17 +4,6 @@ description: "Use when managing skills across multiple agent platforms (pi, Clau
 # @sync: public
 ---
 
-<!--
-🌐 COMMUNITY SKILL
-
-Part of the pi-mono open skills collection.
-- Repository: https://github.com/larsboes/pi-mono
-- License: MIT
-- Author: {{author}}
-
-Last synced: 2026-02-18 21:34:13
--->
-
 # Skill Sync
 
 Multi-platform skill synchronization and management. Maintains skills across pi (source of truth), Claude Code, Antigravity, and the public pi-mono repository.
@@ -53,8 +42,26 @@ This skill manages the flow of skills from **pi** (single source of truth) to:
 ./scripts/list-skills.sh --location pi      # List skills in location
 ```
 
+**Drift Detection:** `sync-status` warns when pi-mono is ahead (rare case when source was updated externally):
+```
+skill-forge: MONO AHEAD (local: 264 lines, mono: 149 lines)
+  → Run: ./scripts/pull-from-mono.sh skill-forge
+```
+
+### Safety Scans (Before Public Sync)
+
+```bash
+./scripts/scan-personality.sh github         # PII/personal-context scan (pi source)
+./scripts/scan-security.sh github            # Secrets/security-pattern scan (pi source)
+./scripts/scan-personality.sh github --target public
+./scripts/scan-security.sh github --target public
+./scripts/scan-personality.sh --all
+./scripts/scan-security.sh --all
+```
+
 ### Synchronization
 
+**Push from pi (normal workflow):**
 ```bash
 # Sync to Claude Code (personal)
 ./scripts/sync-to-claude.sh github --dry-run
@@ -69,6 +76,13 @@ This skill manages the flow of skills from **pi** (single source of truth) to:
 ./scripts/sync-to-public.sh github --dry-run
 ./scripts/sync-to-public.sh github --confirm
 ./scripts/sync-to-public.sh --all --confirm
+```
+
+**Pull from pi-mono (exceptional case):**
+```bash
+# When pi-mono was updated directly (rare), pull changes back to local
+./scripts/pull-from-mono.sh skill-forge --dry-run
+./scripts/pull-from-mono.sh skill-forge --confirm
 ```
 
 ### Diffs & Comparison
@@ -152,11 +166,20 @@ Or mark as personal:
    ./scripts/sync-to-claude.sh <name> --confirm
    ./scripts/sync-to-antigravity.sh <name> --confirm
    ```
-5. **Sync public** (if tagged public):
+5. **Run safety gates** (mandatory for public skills):
+   ```bash
+   ./scripts/scan-personality.sh <name>
+   ./scripts/scan-security.sh <name>
+   ```
+6. **Sync public** (if tagged public):
    ```bash
    ./scripts/sync-to-public.sh <name> --confirm
    ```
-6. **Validate**: Run public validation checks
+7. **Validate output**: Re-scan public copy
+   ```bash
+   ./scripts/scan-personality.sh <name> --target public
+   ./scripts/scan-security.sh <name> --target public
+   ```
 
 ## Workflow: Update Existing Skill
 
@@ -170,11 +193,37 @@ Or mark as personal:
    ./scripts/diff-skill.sh <name> --target claude
    ./scripts/diff-skill.sh <name> --target public
    ```
-4. **Sync to targets**:
+4. **Run public safety gates** (if sync target includes public):
    ```bash
-   ./scripts/sync-to-claude.sh <name> --confirm
-   ./scripts/sync-to-public.sh <name> --confirm
+   ./scripts/scan-personality.sh <name>
+   ./scripts/scan-security.sh <name>
    ```
+
+## Workflow: Pull from pi-mono (Exceptional)
+
+**Use when:** pi-mono was updated directly (e.g., via PR merge, upstream changes, or manual edit) and local `.pi/skills/` needs to catch up. This is **not** the normal workflow — pi should remain source of truth.
+
+1. **Check drift detection**:
+   ```bash
+   ./scripts/sync-status.sh --skill <name>
+   # Look for: "MONO AHEAD: local X lines, mono Y lines"
+   ```
+
+2. **Review what you'll receive**:
+   ```bash
+   ./scripts/diff-skill.sh <name> --source mono
+   # Shows: what pi-mono has that local lacks
+   ```
+
+3. **Pull (destructive — overwrites local)**:
+   ```bash
+   ./scripts/pull-from-mono.sh <name> --dry-run
+   ./scripts/pull-from-mono.sh <name> --confirm
+   ```
+
+4. **Verify**: Test skill in pi after pull
+
+**Warning:** This destroys local changes. If you've edited the skill locally since the mono update, those changes will be lost. Handle conflicts manually or commit local first.
 
 ## Workflow: Deprecate/Remove Skill
 
@@ -191,9 +240,11 @@ Or mark as personal:
 |---------|-----|
 | Editing in .claude directly | Always edit in pi, sync out |
 | Forgetting to tag public skills | Add `@sync: public` comment |
-| Including API keys in public | Run `./scripts/validate-public.sh` |
+| Including API keys in public | Run `./scripts/scan-security.sh <skill>` before sync |
+| Personal examples leaking into public | Run `./scripts/scan-personality.sh <skill>` before sync |
 | Syncing without dry-run | Always `--dry-run` first |
 | Not updating adapters | Run `./scripts/update-adapters.sh` monthly |
+| Using `pull-from-mono` routinely | This is for exceptions only. pi remains source of truth. |
 
 ## Red Flags
 
@@ -201,6 +252,7 @@ Or mark as personal:
 - "This skill has my name in examples" → Mark personal, don't sync public
 - "I don't need to check, I know what changed" → Run diff anyway
 - "Sync all at once without review" → Dry-run first, always
+- "I'll skip scanners this time" → No. Run personality + security scans before public sync.
 
 ## Adapter Configs
 

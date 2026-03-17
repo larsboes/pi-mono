@@ -53,7 +53,13 @@ export default function cortex(pi: ExtensionAPI) {
 		console.log(`[cortex] Session tracking initialized`);
 	});
 
-	pi.on("before_agent_start", async (event, _ctx) => {
+	pi.on("before_agent_start", async (event, ctx) => {
+		// Local Ollama models degrade with large hot-context/memory injection.
+		// Keep system prompt minimal for local inference stability.
+		if ((ctx as any)?.model?.provider === "ollama") {
+			return {};
+		}
+
 		// Phase 7: Full context injection — hot context + semantic search + self-extension status
 		try {
 			const [semanticResults, hotCtx, extensionStatus] = await Promise.all([

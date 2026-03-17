@@ -88,6 +88,21 @@ cd ~/Developer/pi-mono && task install
 
 ---
 
+## 💻 Local Models
+
+Running local LLMs with [Ollama](https://ollama.com) gives you privacy, zero cost, and no TOS risk.
+
+| Model | Use Case | Speed |
+|-------|----------|-------|
+| **Qwen3 (8B)** | Deep thinking but actually fast | ⚡️ Fast |
+| **Qwen2.5-Coder (7B)** | Instant code snippets / small fixes | 🚀 Lightning |
+| **Qwen2.5-Coder (14B)** | Serious coding (The "Pro" choice) | 🏎️ Balanced |
+| **Qwen3 (14B)** | Complex architecture / "Stuck" mode | 🐢 Methodical |
+
+[Setup Guide: Local Models with Ollama →](docs/local-models/README.md)
+
+---
+
 ## ⭐ Featured Skills
 
 ### browser-tools
