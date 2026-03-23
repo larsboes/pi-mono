@@ -1,5 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { readFile as readFileFn } from "node:fs/promises";
+import { existsSync as existsFn } from "node:fs";
+import { join as joinPath } from "node:path";
+import { homedir as getHome } from "node:os";
 import * as memory from "./src/memory.js";
 import * as context from "./src/context.js";
 import * as scratchpad from "./src/scratchpad.js";
@@ -7,11 +11,15 @@ import * as patterns from "./src/patterns.js";
 import * as crystallizer from "./src/crystallizer.js";
 import * as capabilities from "./src/capabilities.js";
 import * as session from "./src/session.js";
+import * as skillTracker from "./src/skill-tracker.js";
+import * as selfExtension from "./src/self-extension.js";
+import * as extensionCreator from "./src/extension-creator.js";
 
 /**
  * Cortex — Self-extending agent extension
  *
- * Phase 6: Full Cortex — memory, context, patterns, crystallization, capabilities.
+ * Phase 7: Full self-extension loop — memory, context, patterns, crystallization,
+ * quality gates, skill tracking, extension creation, and closed feedback loop.
  * See PRD.md for the full build plan.
  */
 export default function cortex(pi: ExtensionAPI) {
@@ -46,12 +54,12 @@ export default function cortex(pi: ExtensionAPI) {
 	});
 
 	pi.on("before_agent_start", async (event, _ctx) => {
-		// Phase 3: Full context injection — hot context (pi-mem style) + semantic search
-		// This replaces memory-bootstrap.ts functionality (Phase 7 prep)
+		// Phase 7: Full context injection — hot context + semantic search + self-extension status
 		try {
-			const [semanticResults, hotCtx] = await Promise.all([
+			const [semanticResults, hotCtx, extensionStatus] = await Promise.all([
 				memory.search(event.prompt, 3),
 				context.loadHotContext(),
+				selfExtension.buildStatus(),
 			]);
 
 			const hotBlock = context.formatHotContext(hotCtx);
@@ -66,10 +74,13 @@ export default function cortex(pi: ExtensionAPI) {
 				semanticBlock = `\n\n## Relevant Past Context (retrieved)\n${contextText}`;
 			}
 
-			if (!hotBlock && !semanticBlock) return {};
+			// Self-extension status (only surfaces when there's something actionable)
+			const extensionBlock = selfExtension.formatStatus(extensionStatus);
+
+			if (!hotBlock && !semanticBlock && !extensionBlock) return {};
 
 			return {
-				systemPrompt: event.systemPrompt + (hotBlock || "") + semanticBlock,
+				systemPrompt: event.systemPrompt + (hotBlock || "") + semanticBlock + extensionBlock,
 			};
 		} catch (e) {
 			console.error(`[cortex] Context injection failed: ${(e as Error).message}`);
@@ -78,8 +89,7 @@ export default function cortex(pi: ExtensionAPI) {
 	});
 
 	pi.on("agent_end", async (event, _ctx) => {
-		// Record per-agent-loop usage and patterns.
-		// This keeps signatures focused and avoids giant whole-session chains.
+		// Record per-agent-loop usage, patterns, and skill loads.
 		try {
 			await capabilities.recordUsage(event.messages);
 			const patternResult = await patterns.recordSession(event.messages);
@@ -89,6 +99,27 @@ export default function cortex(pi: ExtensionAPI) {
 					console.log(`[cortex] ⚡ Pattern "${patternResult.signature}" hit 3 occurrences — crystallization candidate`);
 				}
 			}
+
+			// Track skill loads from read tool calls
+			for (const msg of event.messages) {
+				const m = msg as { role?: string; content?: unknown[] };
+				if (m.role === "assistant" && Array.isArray(m.content)) {
+					for (const block of m.content) {
+						const b = block as { type?: string; name?: string; arguments?: Record<string, unknown>; input?: Record<string, unknown> };
+						if (b.type === "toolCall" && b.name === "read") {
+							const args = b.arguments ?? b.input ?? {};
+							if (typeof args.path === "string") {
+								const skillName = skillTracker.extractSkillName(args.path);
+								if (skillName) {
+									await skillTracker.recordSkillLoad(skillName);
+									console.log(`[cortex] Skill loaded: ${skillName}`);
+								}
+							}
+						}
+					}
+				}
+			}
+
 			// Extract activities for session tracking
 			await session.extractFromMessages(event.messages);
 			const sessionStats = await session.getStats();
@@ -266,6 +297,16 @@ export default function cortex(pi: ExtensionAPI) {
 
 				const status = result.alreadyExisted ? "Updated" : "Created";
 
+				// Build response with quality warnings
+				let response = `${status} skill "${params.name}" at ${result.skillDir}\nFiles: ${result.files.join(", ")}`;
+
+				if (result.qualityWarnings.length > 0) {
+					response += `\n\n⚠ Quality warnings (${result.qualityWarnings.length}):`;
+					for (const w of result.qualityWarnings) {
+						response += `\n  ⚠ ${w}`;
+					}
+				}
+
 				// Auto-reload if we have a captured reload reference
 				let reloaded = false;
 				if (reloadFn) {
@@ -277,14 +318,11 @@ export default function cortex(pi: ExtensionAPI) {
 					}
 				}
 
+				response += reloaded ? "\n✓ Auto-reloaded — skill is now available." : "\nRun /reload to make it available.";
+
 				return {
-					content: [
-						{
-							type: "text" as const,
-							text: `${status} skill "${params.name}" at ${result.skillDir}\nFiles: ${result.files.join(", ")}${reloaded ? "\n✓ Auto-reloaded — skill is now available." : "\nRun /reload to make it available."}`,
-						},
-					],
-					details: {},
+					content: [{ type: "text" as const, text: response }],
+					details: { qualityWarnings: result.qualityWarnings },
 				};
 			} catch (e) {
 				return {
@@ -380,6 +418,169 @@ export default function cortex(pi: ExtensionAPI) {
 							text: `Scratchpad error: ${(e as Error).message}`,
 						},
 					],
+					details: {},
+				};
+			}
+		},
+	});
+
+	// ── New Tools: Self-Extension Loop ───────────────────────────────
+
+	pi.registerTool({
+		name: "create_extension",
+		label: "Create Extension",
+		description:
+			"Create a new pi extension from a template. Generates a TypeScript extension file in ~/.pi/agent/extensions/ with safety guardrails. Templates: tool, context-injector, command, event-logger. Auto-reloads after creation.",
+		parameters: Type.Object({
+			name: Type.String({ description: "Extension name (kebab-case, e.g. 'my-tool')" }),
+			template: Type.String({
+				description: "Template type: 'tool' (LLM-callable tool), 'context-injector' (system prompt injection), 'command' (/slash command), 'event-logger' (lifecycle event logging)",
+			}),
+			description: Type.String({ description: "What this extension does" }),
+			config: Type.String({
+				description: "JSON config for the template. Tool: {toolName, toolDescription, parameters: [{name, type, description, required?}], executeLogic}. Context-injector: {contextContent, condition?}. Command: {commandName, commandDescription, handlerLogic}. Event-logger: {events: [...], logTarget: 'console'|'file'|'notify'}",
+			}),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+			try {
+				// Parse config JSON
+				let config: unknown;
+				try {
+					config = JSON.parse(params.config);
+				} catch {
+					return {
+						content: [{ type: "text" as const, text: "Error: config must be valid JSON" }],
+						details: {},
+					};
+				}
+
+				const result = await extensionCreator.createExtension({
+					name: params.name,
+					template: params.template as extensionCreator.ExtensionTemplate,
+					description: params.description,
+					config: config as any,
+				});
+
+				const status = result.alreadyExisted ? "Updated" : "Created";
+				let response = `${status} extension "${params.name}" (${result.template}) at ${result.extensionPath}`;
+
+				// Auto-reload
+				let reloaded = false;
+				if (reloadFn) {
+					try {
+						await reloadFn();
+						reloaded = true;
+					} catch (e) {
+						console.error(`[cortex] Auto-reload failed: ${(e as Error).message}`);
+					}
+				}
+
+				response += reloaded
+					? "\n✓ Auto-reloaded — extension is now active."
+					: "\nRun /reload to activate.";
+
+				return {
+					content: [{ type: "text" as const, text: response }],
+					details: { template: result.template },
+				};
+			} catch (e) {
+				return {
+					content: [{ type: "text" as const, text: `Extension creation error: ${(e as Error).message}` }],
+					details: {},
+				};
+			}
+		},
+	});
+
+	pi.registerTool({
+		name: "audit_skill",
+		label: "Audit Skill",
+		description:
+			"Run quality audit on a skill. Validates name, description, structure, body size, and actionability. Returns score (0-100%) with specific improvement suggestions.",
+		parameters: Type.Object({
+			name: Type.String({ description: "Skill name to audit (must exist in ~/.pi/skills/)" }),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+			try {
+				const skillDir = joinPath(getHome(), ".pi", "skills", params.name);
+				const skillMd = joinPath(skillDir, "SKILL.md");
+
+				if (!existsFn(skillMd)) {
+					return {
+						content: [{ type: "text" as const, text: `Skill "${params.name}" not found at ${skillMd}` }],
+						details: {},
+					};
+				}
+
+				const content = await readFileFn(skillMd, "utf-8");
+
+				// Parse frontmatter
+				const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+				let description = "";
+				let name = params.name;
+				if (fmMatch) {
+					const descMatch = fmMatch[1].match(/description:\s*["']?(.*?)["']?\s*$/m);
+					if (descMatch) description = descMatch[1];
+					const nameMatch = fmMatch[1].match(/name:\s*(\S+)/);
+					if (nameMatch) name = nameMatch[1];
+				}
+
+				// Extract body (after frontmatter)
+				const body = fmMatch ? content.slice(fmMatch[0].length).trim() : content;
+
+				// Run quality validation
+				const report = crystallizer.validateSkill({
+					name,
+					description,
+					workflow: body,
+				});
+
+				// Check for references directory
+				const refsDir = joinPath(skillDir, "references");
+				const hasRefs = existsFn(refsDir);
+
+				// Build audit response
+				const lines: string[] = [];
+				lines.push(`## Audit: ${params.name}`);
+				lines.push(`**Score: ${report.score}%** ${report.score >= 80 ? "✅ Production-ready" : report.score >= 60 ? "⚠️ Needs work" : "❌ Rewrite recommended"}`);
+				lines.push("");
+
+				if (report.errors.length > 0) {
+					lines.push("### Errors (blocking)");
+					for (const e of report.errors) lines.push(`- ✗ ${e}`);
+					lines.push("");
+				}
+
+				if (report.warnings.length > 0) {
+					lines.push("### Warnings");
+					for (const w of report.warnings) lines.push(`- ⚠ ${w}`);
+					lines.push("");
+				}
+
+				const bodyLines = body.split("\n").length;
+				const bodyWords = body.split(/\s+/).length;
+				lines.push("### Stats");
+				lines.push(`- Lines: ${bodyLines} ${bodyLines > 500 ? "(⚠ over limit)" : "✓"}`);
+				lines.push(`- Words: ${bodyWords} ${bodyWords > 5000 ? "(⚠ over limit)" : "✓"}`);
+				lines.push(`- References: ${hasRefs ? "✓" : "none"}`);
+				lines.push(`- Description length: ${description.length} chars`);
+
+				// Usage tracking
+				const lastUsed = await skillTracker.getLastUsed(params.name);
+				if (lastUsed) {
+					const daysAgo = Math.floor((Date.now() - lastUsed.getTime()) / (24 * 60 * 60 * 1000));
+					lines.push(`- Last loaded: ${daysAgo}d ago`);
+				} else {
+					lines.push(`- Last loaded: never tracked`);
+				}
+
+				return {
+					content: [{ type: "text" as const, text: lines.join("\n") }],
+					details: { score: report.score, errors: report.errors.length, warnings: report.warnings.length },
+				};
+			} catch (e) {
+				return {
+					content: [{ type: "text" as const, text: `Audit error: ${(e as Error).message}` }],
 					details: {},
 				};
 			}
@@ -588,5 +789,5 @@ export default function cortex(pi: ExtensionAPI) {
 		},
 	});
 
-	console.log("[cortex] Extension loaded — Phase 6+ (with auto-session-logging)");
+	console.log("[cortex] Extension loaded — Phase 7 (self-extension loop: patterns + quality gates + skill tracking + extension creation)");
 }
