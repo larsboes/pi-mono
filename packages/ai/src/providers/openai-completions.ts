@@ -801,9 +801,11 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		baseUrl.includes("deepseek.com") ||
 		isZai ||
 		provider === "opencode" ||
-		baseUrl.includes("opencode.ai");
+		baseUrl.includes("opencode.ai") ||
+		provider === "moonshot" ||
+		baseUrl.includes("api.moonshot.cn");
 
-	const useMaxTokens = baseUrl.includes("chutes.ai");
+	const useMaxTokens = baseUrl.includes("chutes.ai") || provider === "moonshot" || baseUrl.includes("api.moonshot.cn");
 
 	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
 	const isGroq = provider === "groq" || baseUrl.includes("groq.com");
