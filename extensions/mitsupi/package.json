@@ -14,10 +14,10 @@
     "@mariozechner/pi-tui": "*"
   },
   "devDependencies": {
-    "@mariozechner/pi-agent-core": "file:../pi-mono/packages/agent",
-    "@mariozechner/pi-ai": "file:../pi-mono/packages/ai",
-    "@mariozechner/pi-coding-agent": "file:../pi-mono/packages/coding-agent",
-    "@mariozechner/pi-tui": "file:../pi-mono/packages/tui",
+    "@mariozechner/pi-agent-core": "file:../../packages/agent",
+    "@mariozechner/pi-ai": "file:../../packages/ai",
+    "@mariozechner/pi-coding-agent": "file:../../packages/coding-agent",
+    "@mariozechner/pi-tui": "file:../../packages/tui",
     "typescript": "^5.7.0"
   },
   "dependencies": {
