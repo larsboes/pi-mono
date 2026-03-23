@@ -82,8 +82,7 @@ export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 }
 
 function loadGeminiKey(): string | null {
-	if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-
+	// Prefer .env file over process.env (shell env may have stale keys)
 	try {
 		const content = require("node:fs").readFileSync(ENV_FILE, "utf-8");
 		for (const line of content.split("\n")) {
@@ -95,6 +94,8 @@ function loadGeminiKey(): string | null {
 	} catch {
 		// No .env file
 	}
+
+	if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
 	return null;
 }
 
