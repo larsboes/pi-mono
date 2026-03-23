@@ -8,7 +8,6 @@ import answer from "./answer.js";
 import context from "./context.js";
 import control from "./control.js";
 import files from "./files.js";
-import goToBed from "./go-to-bed.js";
 import loop from "./loop.js";
 import notify from "./notify.js";
 import promptEditor from "./prompt-editor.js";
@@ -24,7 +23,6 @@ export default function (pi: ExtensionAPI) {
 	context(pi);
 	control(pi);
 	files(pi);
-	goToBed(pi);
 	loop(pi);
 	notify(pi);
 	promptEditor(pi);
