@@ -763,8 +763,12 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
 	switch (reason) {
 		case "stop":
 		case "end":
+		case "eos":
+		case "eos_token":
 			return { stopReason: "stop" };
 		case "length":
+		case "model_length":
+		case "max_tokens":
 			return { stopReason: "length" };
 		case "function_call":
 		case "tool_calls":
@@ -774,6 +778,9 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
 		case "network_error":
 			return { stopReason: "error", errorMessage: "Provider finish_reason: network_error" };
 		default:
+			if (process.env.DEBUG) {
+				console.warn(`[pi-ai] Unknown finish_reason from provider: "${reason}"`);
+			}
 			return {
 				stopReason: "error",
 				errorMessage: `Provider finish_reason: ${reason}`,
