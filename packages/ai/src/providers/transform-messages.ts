@@ -109,11 +109,22 @@ export function transformMessages<TApi extends Api>(
 			if (pendingToolCalls.length > 0) {
 				for (const tc of pendingToolCalls) {
 					if (!existingToolResultIds.has(tc.id)) {
+						const parseQuality = (tc as any).parseQuality;
+						const parseError = (tc as any).parseError;
+						const hasEmptyArgs = !tc.arguments || Object.keys(tc.arguments).length === 0;
+						let errorText = "No result provided";
+						if (parseQuality === "failed") {
+							errorText = `Tool call arguments failed to parse${parseError ? `: ${parseError}` : ""}`;
+						} else if (parseQuality === "partial") {
+							errorText = "Tool call arguments were incomplete (partial parse)";
+						} else if (hasEmptyArgs) {
+							errorText = "Tool call had no arguments";
+						}
 						result.push({
 							role: "toolResult",
 							toolCallId: tc.id,
 							toolName: tc.name,
-							content: [{ type: "text", text: "No result provided" }],
+							content: [{ type: "text", text: errorText }],
 							isError: true,
 							timestamp: Date.now(),
 						} as ToolResultMessage);
@@ -149,11 +160,22 @@ export function transformMessages<TApi extends Api>(
 			if (pendingToolCalls.length > 0) {
 				for (const tc of pendingToolCalls) {
 					if (!existingToolResultIds.has(tc.id)) {
+						const parseQuality = (tc as any).parseQuality;
+						const parseError = (tc as any).parseError;
+						const hasEmptyArgs = !tc.arguments || Object.keys(tc.arguments).length === 0;
+						let errorText = "No result provided";
+						if (parseQuality === "failed") {
+							errorText = `Tool call arguments failed to parse${parseError ? `: ${parseError}` : ""}`;
+						} else if (parseQuality === "partial") {
+							errorText = "Tool call arguments were incomplete (partial parse)";
+						} else if (hasEmptyArgs) {
+							errorText = "Tool call had no arguments";
+						}
 						result.push({
 							role: "toolResult",
 							toolCallId: tc.id,
 							toolName: tc.name,
-							content: [{ type: "text", text: "No result provided" }],
+							content: [{ type: "text", text: errorText }],
 							isError: true,
 							timestamp: Date.now(),
 						} as ToolResultMessage);

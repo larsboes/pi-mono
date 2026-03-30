@@ -27,7 +27,7 @@ import type {
 	ToolResultMessage,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
-import { parseStreamingJson } from "../utils/json-parse.js";
+import { parseStreamingJson, parseStreamingJsonWithQuality } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.js";
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
@@ -114,8 +114,13 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 							partial: output,
 						});
 					} else if (block.type === "toolCall") {
-						block.arguments = parseStreamingJson(block.partialArgs);
+						const parseResult = parseStreamingJsonWithQuality(block.partialArgs);
+						block.arguments = parseResult.value;
 						delete block.partialArgs;
+						if (parseResult.quality !== "complete") {
+							(block as any).parseQuality = parseResult.quality;
+							if (parseResult.error) (block as any).parseError = parseResult.error;
+						}
 						stream.push({
 							type: "toolcall_end",
 							contentIndex: blockIndex(),
