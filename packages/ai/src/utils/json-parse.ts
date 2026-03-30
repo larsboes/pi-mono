@@ -19,9 +19,18 @@ export function parseStreamingJson<T = any>(partialJson: string | undefined): T 
 		// Try partial-json for incomplete JSON
 		try {
 			const result = partialParse(partialJson);
+			if (process.env.DEBUG) {
+				console.warn(
+					`[tool-parse] Partial JSON recovery (${partialJson.length} chars): ...${partialJson.slice(-80)}`,
+				);
+			}
 			return (result ?? {}) as T;
 		} catch {
-			// If all parsing fails, return empty object
+			if (process.env.DEBUG) {
+				console.error(
+					`[tool-parse] Failed to parse tool args (${partialJson.length} chars): ...${partialJson.slice(-80)}`,
+				);
+			}
 			return {} as T;
 		}
 	}
