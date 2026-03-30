@@ -1,9 +1,9 @@
 <!-- OSS_WEEKEND_START -->
 # 🏖️ OSS Weekend
 
-**Issue tracker reopens Monday, March 30, 2026.**
+**Issue tracker reopens Monday, April 6, 2026.**
 
-OSS weekend runs Sunday, March 22, 2026 through Monday, March 30, 2026. New issues are auto-closed during this time. For support, join [Discord](https://discord.com/invite/3cU7Bz4UPx).
+OSS weekend runs Friday, March 27, 2026 through Monday, April 6, 2026. New issues are auto-closed during this time. For support, join [Discord](https://discord.com/invite/3cU7Bz4UPx).
 <!-- OSS_WEEKEND_END -->
 
 ---
@@ -395,7 +395,7 @@ import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "
 const { session } = await createAgentSession({
   sessionManager: SessionManager.inMemory(),
   authStorage: AuthStorage.create(),
-  modelRegistry: new ModelRegistry(authStorage),
+  modelRegistry: ModelRegistry.create(authStorage),
 });
 
 await session.prompt("What files are in the current directory?");

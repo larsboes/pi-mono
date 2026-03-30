@@ -293,10 +293,11 @@ Fired by the `pi` CLI during startup session resolution, before the initial sess
 This event is:
 - CLI-only. It is not emitted in SDK mode.
 - Startup-only. It is not emitted for later interactive `/new` or `/resume` actions.
-- Bypassed when `--session-dir` is provided.
+- Lower priority than `--session-dir` and `sessionDir` in `settings.json`.
 - Special-cased to receive no `ctx` argument.
 
 If multiple extensions return `sessionDir`, the last one wins.
+Combined precedence is: `--session-dir` CLI flag, then `sessionDir` in settings, then extension `session_directory` hooks.
 
 ```typescript
 pi.on("session_directory", async (event) => {
@@ -564,17 +565,27 @@ Before `tool_call` runs, pi waits for previously emitted Agent events to finish 
 
 In the default parallel tool execution mode, sibling tool calls from the same assistant message are preflighted sequentially, then executed concurrently. `tool_call` is not guaranteed to see sibling tool results from that same assistant message in `ctx.sessionManager`.
 
+`event.input` is mutable. Mutate it in place to patch tool arguments before execution.
+
+Behavior guarantees:
+- Mutations to `event.input` affect the actual tool execution
+- Later `tool_call` handlers see mutations made by earlier handlers
+- No re-validation is performed after your mutation
+- Return values from `tool_call` only control blocking via `{ block: true, reason?: string }`
+
 ```typescript
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 
 pi.on("tool_call", async (event, ctx) => {
   // event.toolName - "bash", "read", "write", "edit", etc.
   // event.toolCallId
-  // event.input - tool parameters
+  // event.input - tool parameters (mutable)
 
   // Built-in tools: no type params needed
   if (isToolCallEventType("bash", event)) {
     // event.input is { command: string; timeout?: number }
+    event.input.command = `source ~/.profile\n${event.input.command}`;
+
     if (event.input.command.includes("rm -rf")) {
       return { block: true, reason: "Dangerous command" };
     }
@@ -618,6 +629,8 @@ Fired after tool execution finishes and before `tool_execution_end` plus the fin
 - Each handler sees the latest result after previous handler changes
 - Handlers can return partial patches (`content`, `details`, or `isError`); omitted fields keep their current values
 
+Use `ctx.signal` for nested async work inside the handler. This lets Esc cancel model calls, `fetch()`, and other abort-aware operations started by the extension.
+
 ```typescript
 import { isBashToolResult } from "@mariozechner/pi-coding-agent";
 
@@ -628,6 +641,12 @@ pi.on("tool_result", async (event, ctx) => {
   if (isBashToolResult(event)) {
     // event.details is typed as BashToolDetails
   }
+
+  const response = await fetch("https://example.com/summarize", {
+    method: "POST",
+    body: JSON.stringify({ content: event.content }),
+    signal: ctx.signal,
+  });
 
   // Modify result:
   return { content: [...], details: {...}, isError: false };
@@ -747,6 +766,31 @@ ctx.sessionManager.getLeafId()        // Current leaf entry ID
 ### ctx.modelRegistry / ctx.model
 
 Access to models and API keys.
+
+### ctx.signal
+
+The current agent abort signal, or `undefined` when no agent turn is active.
+
+Use this for abort-aware nested work started by extension handlers, for example:
+- `fetch(..., { signal: ctx.signal })`
+- model calls that accept `signal`
+- file or process helpers that accept `AbortSignal`
+
+`ctx.signal` is typically defined during active turn events such as `tool_call`, `tool_result`, `message_update`, and `turn_end`.
+It is usually `undefined` in idle or non-turn contexts such as session events, extension commands, and shortcuts fired while pi is idle.
+
+```typescript
+pi.on("tool_result", async (event, ctx) => {
+  const response = await fetch("https://example.com/api", {
+    method: "POST",
+    body: JSON.stringify(event),
+    signal: ctx.signal,
+  });
+
+  const data = await response.json();
+  return { details: data };
+});
+```
 
 ### ctx.isIdle() / ctx.abort() / ctx.hasPendingMessages()
 
@@ -964,6 +1008,12 @@ pi.registerTool({
     action: StringEnum(["list", "add"] as const),
     text: Type.Optional(Type.String()),
   }),
+  prepareArguments(args) {
+    // Optional compatibility shim. Runs before schema validation.
+    // Return the current schema shape, for example to fold legacy fields
+    // into the modern parameter object.
+    return args;
+  },
 
   async execute(toolCallId, params, signal, onUpdate, ctx) {
     // Stream progress
@@ -1428,6 +1478,14 @@ pi.registerTool({
     action: StringEnum(["list", "add"] as const),  // Use StringEnum for Google compatibility
     text: Type.Optional(Type.String()),
   }),
+  prepareArguments(args) {
+    if (!args || typeof args !== "object") return args;
+    const input = args as { action?: string; oldAction?: string };
+    if (typeof input.oldAction === "string" && input.action === undefined) {
+      return { ...input, action: input.oldAction };
+    }
+    return args;
+  },
 
   async execute(toolCallId, params, signal, onUpdate, ctx) {
     // Check for cancellation
@@ -1470,6 +1528,53 @@ async execute(toolCallId, params) {
 ```
 
 **Important:** Use `StringEnum` from `@mariozechner/pi-ai` for string enums. `Type.Union`/`Type.Literal` doesn't work with Google's API.
+
+**Argument preparation:** `prepareArguments(args)` is optional. If defined, it runs before schema validation and before `execute()`. Use it to mimic an older accepted input shape when pi resumes an older session whose stored tool call arguments no longer match the current schema. Return the object you want validated against `parameters`. Keep the public schema strict. Do not add deprecated compatibility fields to `parameters` just to keep old resumed sessions working.
+
+Example: an older session may contain an `edit` tool call with top-level `oldText` and `newText`, while the current schema only accepts `edits: [{ oldText, newText }]`.
+
+```typescript
+pi.registerTool({
+  name: "edit",
+  label: "Edit",
+  description: "Edit a single file using exact text replacement",
+  parameters: Type.Object({
+    path: Type.String(),
+    edits: Type.Array(
+      Type.Object({
+        oldText: Type.String(),
+        newText: Type.String(),
+      }),
+    ),
+  }),
+  prepareArguments(args) {
+    if (!args || typeof args !== "object") return args;
+
+    const input = args as {
+      path?: string;
+      edits?: Array<{ oldText: string; newText: string }>;
+      oldText?: unknown;
+      newText?: unknown;
+    };
+
+    if (typeof input.oldText !== "string" || typeof input.newText !== "string") {
+      return args;
+    }
+
+    return {
+      ...input,
+      edits: [...(input.edits ?? []), { oldText: input.oldText, newText: input.newText }],
+    };
+  },
+  async execute(toolCallId, params, signal, onUpdate, ctx) {
+    // params now matches the current schema
+    return {
+      content: [{ type: "text", text: `Applying ${params.edits.length} edit block(s)` }],
+      details: {},
+    };
+  },
+});
+```
 
 ### Overriding Built-in Tools
 
