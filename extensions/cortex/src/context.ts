@@ -11,12 +11,13 @@
  * - daily/YYYY-MM-DD.md (today + yesterday — recent continuity)
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import * as scratchpad from "./scratchpad.js";
 
 const MEMORY_DIR = join(homedir(), ".pi", "memory");
+const TELOS_DIR = join(MEMORY_DIR, "TELOS");
 
 async function readFileSafe(path: string): Promise<string | null> {
 	try {
@@ -41,17 +42,38 @@ export interface HotContext {
 	soul: string | null;
 	user: string | null;
 	memory: string | null;
+	telos: string | null;
 	scratchpadOpen: string[];
 	todayLog: string | null;
 	yesterdayLog: string | null;
 }
 
+/**
+ * Load TELOS summary from Obsidian vault (via symlink chain:
+ * ~/.pi/memory/TELOS → ~/.pai/USER/TELOS → ~/Developer/knowledge-base/Atlas/TELOS)
+ * Reads GOALS.md, MISSION.md, and STATUS.md for a compact life context snapshot.
+ */
+async function loadTelosSummary(): Promise<string | null> {
+	const priorityFiles = ["GOALS.md", "MISSION.md", "STATUS.md"];
+	const parts: string[] = [];
+
+	for (const file of priorityFiles) {
+		const content = await readFileSafe(join(TELOS_DIR, file));
+		if (content) {
+			parts.push(content.trim());
+		}
+	}
+
+	return parts.length > 0 ? parts.join("\n\n---\n\n") : null;
+}
+
 export async function loadHotContext(): Promise<HotContext> {
-	const [identity, soul, user, memory, scratchpadOpen, todayLog, yesterdayLog] = await Promise.all([
+	const [identity, soul, user, memory, telos, scratchpadOpen, todayLog, yesterdayLog] = await Promise.all([
 		readFileSafe(join(MEMORY_DIR, "IDENTITY.md")),
 		readFileSafe(join(MEMORY_DIR, "SOUL.md")),
 		readFileSafe(join(MEMORY_DIR, "USER.md")),
 		readFileSafe(join(MEMORY_DIR, "MEMORY.md")),
+		loadTelosSummary(),
 		scratchpad.getOpenItems(),
 		readFileSafe(join(MEMORY_DIR, "daily", `${getTodayDate()}.md`)),
 		readFileSafe(join(MEMORY_DIR, "daily", `${getYesterdayDate()}.md`)),
@@ -62,6 +84,7 @@ export async function loadHotContext(): Promise<HotContext> {
 		soul,
 		user,
 		memory,
+		telos,
 		scratchpadOpen,
 		todayLog,
 		yesterdayLog,
@@ -82,6 +105,9 @@ export function formatHotContext(ctx: HotContext): string | null {
 	}
 	if (ctx.memory) {
 		parts.push(`## Long-term Memory\n${ctx.memory}`);
+	}
+	if (ctx.telos) {
+		parts.push(`## Life Context (TELOS)\n${ctx.telos}`);
 	}
 	if (ctx.scratchpadOpen.length > 0) {
 		parts.push(`## Open Scratchpad Items\n${ctx.scratchpadOpen.join("\n")}`);
