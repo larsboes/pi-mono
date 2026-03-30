@@ -296,11 +296,13 @@ function loadSkillFromFile(
 			diagnostics.push({ type: "warning", message: error, path: filePath });
 		}
 
-		// Use name from frontmatter, or fall back to parent directory name
-		const name = frontmatter.name || parentDirName;
+		// Use name from frontmatter, or fall back to parent directory name.
+		// Normalize TitleCase to kebab-case for PAI compatibility (e.g. "BeCreative" -> "be-creative")
+		const rawName = frontmatter.name || parentDirName;
+		const name = rawName.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
-		// Validate name
-		const nameErrors = validateName(name, parentDirName);
+		// Validate name (skip parent dir match when parent is "src" — PAI Pack structure)
+		const nameErrors = validateName(name, parentDirName === "src" ? name : parentDirName);
 		for (const error of nameErrors) {
 			diagnostics.push({ type: "warning", message: error, path: filePath });
 		}
