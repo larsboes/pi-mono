@@ -280,6 +280,10 @@ export interface OpenAICompletionsCompat {
 	vercelGatewayRouting?: VercelGatewayRouting;
 	/** Whether the provider supports the `strict` field in tool definitions. Default: true. */
 	supportsStrictMode?: boolean;
+	/** Maximum number of tools to send per request. Weaker models struggle with many tools. Default: unlimited. */
+	maxToolsPerRequest?: number;
+	/** Whether to simplify tool parameter schemas (flatten allOf/anyOf, remove complex validations). Default: "full". */
+	toolParametersFormat?: "full" | "simplified";
 }
 
 /** Compatibility settings for OpenAI Responses APIs. */

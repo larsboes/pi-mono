@@ -715,16 +715,62 @@ function convertTools(
 	tools: Tool[],
 	compat: Required<OpenAICompletionsCompat>,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
-	return tools.map((tool) => ({
+	// Limit tool count for weaker models that struggle with many tools
+	let selectedTools = tools;
+	if (compat.maxToolsPerRequest > 0 && tools.length > compat.maxToolsPerRequest) {
+		selectedTools = tools.slice(0, compat.maxToolsPerRequest);
+	}
+
+	return selectedTools.map((tool) => ({
 		type: "function",
 		function: {
 			name: tool.name,
 			description: tool.description,
-			parameters: tool.parameters as any, // TypeBox already generates JSON Schema
+			parameters:
+				compat.toolParametersFormat === "simplified"
+					? simplifySchema(tool.parameters as any)
+					: (tool.parameters as any),
 			// Only include strict if provider supports it. Some reject unknown fields.
 			...(compat.supportsStrictMode !== false && { strict: false }),
 		},
 	}));
+}
+
+/**
+ * Simplify a JSON Schema for weaker models that struggle with complex schemas.
+ * Flattens allOf/anyOf, removes complex validations, limits nesting depth.
+ */
+function simplifySchema(schema: Record<string, any>, depth = 0): Record<string, any> {
+	if (!schema || typeof schema !== "object") return schema;
+	if (depth > 2) return { type: "object" };
+
+	const result: Record<string, any> = {};
+
+	// Resolve allOf/anyOf/oneOf by taking the first option
+	if (schema.allOf?.length) return simplifySchema(schema.allOf[0], depth);
+	if (schema.anyOf?.length) return simplifySchema(schema.anyOf[0], depth);
+	if (schema.oneOf?.length) return simplifySchema(schema.oneOf[0], depth);
+
+	// Keep core fields
+	if (schema.type) result.type = schema.type;
+	if (schema.description) result.description = schema.description;
+	if (schema.required) result.required = schema.required;
+	if (schema.enum) result.enum = schema.enum.slice(0, 10); // cap enum cardinality
+
+	// Recurse into properties
+	if (schema.properties) {
+		result.properties = {};
+		for (const [key, value] of Object.entries(schema.properties)) {
+			result.properties[key] = simplifySchema(value as Record<string, any>, depth + 1);
+		}
+	}
+
+	// Simplify array items
+	if (schema.items) {
+		result.items = simplifySchema(schema.items, depth + 1);
+	}
+
+	return result;
 }
 
 function parseChunkUsage(
@@ -845,6 +891,8 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		openRouterRouting: {},
 		vercelGatewayRouting: {},
 		supportsStrictMode: true,
+		maxToolsPerRequest: 0,
+		toolParametersFormat: "full",
 	};
 }
 
@@ -871,5 +919,7 @@ function getCompat(model: Model<"openai-completions">): Required<OpenAICompletio
 		openRouterRouting: model.compat.openRouterRouting ?? {},
 		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
+		maxToolsPerRequest: model.compat.maxToolsPerRequest ?? detected.maxToolsPerRequest,
+		toolParametersFormat: model.compat.toolParametersFormat ?? detected.toolParametersFormat,
 	};
 }
