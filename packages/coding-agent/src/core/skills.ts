@@ -301,8 +301,10 @@ function loadSkillFromFile(
 		const rawName = frontmatter.name || parentDirName;
 		const name = rawName.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
-		// Validate name (skip parent dir match when parent is "src" — PAI Pack structure)
-		const nameErrors = validateName(name, parentDirName === "src" ? name : parentDirName);
+		// Validate name — normalize parent dir the same way for comparison
+		const normalizedParentDir =
+			parentDirName === "src" ? name : parentDirName.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+		const nameErrors = validateName(name, normalizedParentDir);
 		for (const error of nameErrors) {
 			diagnostics.push({ type: "warning", message: error, path: filePath });
 		}
