@@ -485,6 +485,20 @@ async function prepareToolCall(
 		};
 	}
 
+	// Early exit if tool call arguments failed to parse (weaker models like Kimi/Llama)
+	const parseQuality = (toolCall as any).parseQuality;
+	if (parseQuality === "failed") {
+		const parseError = (toolCall as any).parseError || "unknown";
+		return {
+			kind: "immediate",
+			result: createErrorToolResult(
+				`Your tool call arguments for "${toolCall.name}" could not be parsed as valid JSON. ` +
+					`Parse error: ${parseError}. Please retry with valid JSON arguments.`,
+			),
+			isError: true,
+		};
+	}
+
 	try {
 		const preparedToolCall = prepareToolCallArguments(tool, toolCall);
 		const validatedArgs = validateToolArguments(tool, preparedToolCall);
