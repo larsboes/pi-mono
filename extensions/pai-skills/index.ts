@@ -36,7 +36,9 @@ function discoverSkillPaths(repoPath: string): string[] {
 		} catch {}
 	}
 
-	// Packs: {repo}/Packs/{Pack}/src/...
+	// Packs: {repo}/Packs/{Pack}/src/{name}/SKILL.md
+	// Each sub-skill is loaded individually. Pack router SKILL.md (src/SKILL.md)
+	// is a Claude Code routing concept — pi loads each sub-skill directly.
 	const packsDir = join(resolved, "Packs");
 	if (existsSync(packsDir)) {
 		try {
@@ -46,24 +48,20 @@ function discoverSkillPaths(repoPath: string): string[] {
 				const srcDir = join(packsDir, packEntry.name, "src");
 				if (!existsSync(srcDir)) continue;
 
-				const hasRouter = existsSync(join(srcDir, "SKILL.md"));
-
-				// Pack-level router: src/SKILL.md
-				if (hasRouter) {
-					paths.push(srcDir);
-				}
-
 				// Sub-skills: src/{name}/SKILL.md
-				// Only add as standalone if there's NO router (otherwise they're nested inside the router)
+				let hasSubSkills = false;
 				for (const subEntry of readdirSync(srcDir, { withFileTypes: true })) {
 					if (!subEntry.isDirectory()) continue;
 					if (existsSync(join(srcDir, subEntry.name, "SKILL.md"))) {
-						if (!hasRouter) {
-							// No router -> sub-skill is standalone
-							paths.push(join(srcDir, subEntry.name));
-						}
-						// With router -> sub-skill is nested, already included via router's srcDir
+						paths.push(join(srcDir, subEntry.name));
+						hasSubSkills = true;
 					}
+				}
+
+				// Pack-level SKILL.md: pass as file path since parent dir is "src"
+				// which won't match the name field in frontmatter
+				if (existsSync(join(srcDir, "SKILL.md"))) {
+					paths.push(join(srcDir, "SKILL.md"));
 				}
 			}
 		} catch {}
