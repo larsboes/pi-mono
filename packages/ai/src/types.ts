@@ -278,6 +278,8 @@ export interface OpenAICompletionsCompat {
 	openRouterRouting?: OpenRouterRouting;
 	/** Vercel AI Gateway routing preferences. Only used when baseUrl points to Vercel AI Gateway. */
 	vercelGatewayRouting?: VercelGatewayRouting;
+	/** Whether z.ai supports top-level `tool_stream: true` for streaming tool call deltas. Default: false. */
+	zaiToolStream?: boolean;
 	/** Whether the provider supports the `strict` field in tool definitions. Default: true. */
 	supportsStrictMode?: boolean;
 	/** Maximum number of tools to send per request. Weaker models struggle with many tools. Default: unlimited. */
