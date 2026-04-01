@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 const HOME = homedir();
 const CORTEX_DIR = join(HOME, ".pi", "memory", "cortex");
 const CAPABILITIES_FILE = join(CORTEX_DIR, "CAPABILITIES.md");
-const SKILLS_DIR = join(HOME, ".pi", "skills");
+const SKILLS_DIR = join(HOME, ".pi", "agent", "skills");
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

@@ -63,12 +63,9 @@ export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 		if (!existsSync(dir)) await mkdir(dir, { recursive: true });
 	}
 
-	// Load API key — fall back to local embeddings if unavailable
-	geminiKey = loadGeminiKey();
-	if (!geminiKey) {
-		console.log(`[cortex/memory] No GEMINI_API_KEY found, using local embeddings (${LOCAL_EMBEDDING_MODEL})`);
-		usingLocalEmbeddings = true;
-	}
+	// Always use local embeddings — no external API calls
+	usingLocalEmbeddings = true;
+	console.log(`[cortex/memory] Using local embeddings (${LOCAL_EMBEDDING_MODEL})`);
 
 	// Init vector index
 	index = new LocalIndex(INDEX_DIR);
@@ -164,16 +161,6 @@ async function getLocalEmbedding(text: string): Promise<number[] | null> {
 }
 
 async function getEmbedding(text: string): Promise<number[] | null> {
-	// Primary: Gemini API
-	if (geminiKey) {
-		try {
-			return await getGeminiEmbedding(text);
-		} catch (e) {
-			console.error(`[cortex/memory] Gemini embedding failed: ${(e as Error).message}, falling back to local`);
-		}
-	}
-
-	// Fallback: local model
 	return getLocalEmbedding(text);
 }
 

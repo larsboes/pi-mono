@@ -200,7 +200,7 @@ export default function cortex(pi: ExtensionAPI) {
 		name: "memory_search",
 		label: "Memory Search",
 		description:
-			"Search long-term memory for relevant past context, learnings, and decisions. Uses semantic vector search (Gemini embeddings) with keyword fallback. Optional cross-encoder reranking for higher precision.",
+			"Search long-term memory for relevant past context, learnings, and decisions. Uses semantic vector search (local embeddings) with keyword fallback. Optional cross-encoder reranking for higher precision.",
 		parameters: Type.Object({
 			query: Type.String({ description: "Search query — natural language or keywords" }),
 			limit: Type.Optional(Type.Number({ description: "Max results (default: 5)", default: 5 })),

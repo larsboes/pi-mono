@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 
-const SKILLS_DIR = join(homedir(), ".pi", "skills");
+const SKILLS_DIR = join(homedir(), ".pi", "agent", "skills");
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

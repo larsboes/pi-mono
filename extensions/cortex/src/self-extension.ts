@@ -15,7 +15,7 @@ import * as patterns from "./patterns.js";
 import * as skillTracker from "./skill-tracker.js";
 
 const HOME = homedir();
-const SKILLS_DIR = join(HOME, ".pi", "skills");
+const SKILLS_DIR = join(HOME, ".pi", "agent", "skills");
 const EXTENSIONS_DIR = join(HOME, ".pi", "agent", "extensions");
 
 // ── Types ──────────────────────────────────────────────────────────────────
