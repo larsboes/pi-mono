@@ -281,6 +281,8 @@ export interface OpenAICompletionsCompat {
 	zaiToolStream?: boolean;
 	/** Whether the provider supports the `strict` field in tool definitions. Default: true. */
 	supportsStrictMode?: boolean;
+	/** Maximum number of tools to send per request. Weaker models degrade with too many tools. Default: unlimited. */
+	maxToolsPerRequest?: number;
 }
 
 /** Compatibility settings for OpenAI Responses APIs. */

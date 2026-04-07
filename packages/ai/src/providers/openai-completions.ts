@@ -718,7 +718,9 @@ function convertTools(
 	tools: Tool[],
 	compat: Required<OpenAICompletionsCompat>,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
-	return tools.map((tool) => ({
+	const limited =
+		compat.maxToolsPerRequest && compat.maxToolsPerRequest > 0 ? tools.slice(0, compat.maxToolsPerRequest) : tools;
+	return limited.map((tool) => ({
 		type: "function",
 		function: {
 			name: tool.name,
@@ -850,6 +852,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		vercelGatewayRouting: {},
 		zaiToolStream: false,
 		supportsStrictMode: true,
+		maxToolsPerRequest: 0,
 	};
 }
 
@@ -877,5 +880,6 @@ function getCompat(model: Model<"openai-completions">): Required<OpenAICompletio
 		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
 		zaiToolStream: model.compat.zaiToolStream ?? detected.zaiToolStream,
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
+		maxToolsPerRequest: model.compat.maxToolsPerRequest ?? detected.maxToolsPerRequest,
 	};
 }

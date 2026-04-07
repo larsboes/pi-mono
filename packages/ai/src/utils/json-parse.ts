@@ -20,8 +20,14 @@ export function parseStreamingJson<T = any>(partialJson: string | undefined): T 
 		try {
 			const result = partialParse(partialJson);
 			return (result ?? {}) as T;
-		} catch {
-			// If all parsing fails, return empty object
+		} catch (e) {
+			// If all parsing fails, log in debug mode and return empty object
+			if (process.env.DEBUG) {
+				const preview = partialJson.length > 200 ? `${partialJson.slice(0, 200)}...` : partialJson;
+				console.warn(
+					`[json-parse] Failed to parse streaming JSON (${partialJson.length} chars): ${(e as Error).message}\n  Preview: ${preview}`,
+				);
+			}
 			return {} as T;
 		}
 	}

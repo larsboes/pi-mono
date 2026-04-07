@@ -113,7 +113,12 @@ export function transformMessages<TApi extends Api>(
 							role: "toolResult",
 							toolCallId: tc.id,
 							toolName: tc.name,
-							content: [{ type: "text", text: "No result provided" }],
+							content: [
+								{
+									type: "text",
+									text: `Tool call '${tc.name}' did not return a result (orphaned — model continued before tool responded)`,
+								},
+							],
 							isError: true,
 							timestamp: Date.now(),
 						} as ToolResultMessage);
@@ -153,7 +158,12 @@ export function transformMessages<TApi extends Api>(
 							role: "toolResult",
 							toolCallId: tc.id,
 							toolName: tc.name,
-							content: [{ type: "text", text: "No result provided" }],
+							content: [
+								{
+									type: "text",
+									text: `Tool call '${tc.name}' did not return a result (orphaned — user message interrupted tool flow)`,
+								},
+							],
 							isError: true,
 							timestamp: Date.now(),
 						} as ToolResultMessage);
