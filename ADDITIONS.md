@@ -50,25 +50,20 @@ Keep this file updated when adding patches or merging upstream.
 ## Branch Strategy
 
 ```
-upstream/main   badlogic/pi-mono (source of truth)
-      │
-      ▼
-main            mirrors upstream (merge regularly)
-      │
-      ▼
-lars/dev        our patches on top (rebase onto main after upstream merge)
+main    = pure upstream mirror (never commit here)
+dev     = upstream + our patches (work here always)
 ```
 
-**Upgrade flow:**
+**Upgrade flow (when upstream releases):**
 ```bash
+git checkout dev
 git fetch upstream
-git checkout main
 git merge upstream/main
-git push origin main
-git checkout lars/dev
-git rebase main
-# resolve conflicts in the 4 patched files if needed
-git push origin lars/dev --force-with-lease
+# resolve conflicts (generate-models.ts most likely)
+bun run build    # verify
+git push origin dev
+# optionally sync main:
+git checkout main && git merge upstream/main && git push origin main && git checkout dev
 ```
 
 ---
