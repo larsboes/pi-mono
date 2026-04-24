@@ -320,8 +320,12 @@ export const streamSimpleBedrock: StreamFunction<"bedrock-converse-stream", Simp
 
 	if (model.id.includes("anthropic.claude") || model.id.includes("anthropic/claude")) {
 		if (supportsAdaptiveThinking(model.id)) {
+			// Adaptive thinking: the API manages thinking budget internally.
+			// Use the model's full maxTokens so the API has room for both thinking and text output.
+			// The 32k default from buildBaseOptions is too restrictive for 128k-output models.
 			return streamBedrock(model, context, {
 				...base,
+				maxTokens: options?.maxTokens || model.maxTokens,
 				reasoning: options.reasoning,
 				thinkingBudgets: options.thinkingBudgets,
 			} satisfies BedrockOptions);
