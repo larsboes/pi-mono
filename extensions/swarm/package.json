@@ -4,8 +4,9 @@
   "description": "Multi-agent YAML DAG orchestration for pi. Ported from can1357/oh-my-pi packages/swarm-extension.",
   "type": "module",
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "^0.34.49",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
