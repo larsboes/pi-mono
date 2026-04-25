@@ -47,6 +47,16 @@ Keep this file updated when adding patches or merging upstream.
 
 ---
 
+### 5. Bun runtime for the agent binary
+
+**What:** `pi` alias uses `bun` instead of `node` to run `dist/cli.js`.
+
+**Why:** Bun runs Node.js output natively with faster startup. Zero code changes — the built output is identical. Build toolchain stays npm (upstream compatible).
+
+**Conflict risk on upstream merge:** None — this is only in dotfiles, not in pi-mono source.
+
+---
+
 ## Branch Strategy
 
 ```
