@@ -1,0 +1,38 @@
+{
+  "name": "pi-markdown-preview",
+  "version": "0.9.6",
+  "description": "Rendered markdown + LaTeX preview for pi, with terminal, browser, and PDF output",
+  "type": "module",
+  "scripts": {
+    "check:readme-commands": "node ./scripts/check-readme-commands.mjs",
+    "check:regressions": "node ./test/regressions.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pi-package"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omaclaren/pi-markdown-preview.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "screenshots/dark-terminal.png"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.22.3"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.64.0",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.7.3",
+    "@mariozechner/pi-tui": "^0.64.0"
+  }
+}

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.pi/ceo-board/briefs/
+.pi/ceo-board/deliberations/
+.pi/ceo-board/memos/
