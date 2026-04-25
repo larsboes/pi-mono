@@ -50,24 +50,23 @@ Keep this file updated when adding patches or merging upstream.
 ## Branch Strategy
 
 ```
-main    = pure upstream mirror (never commit here)
-dev     = upstream + our patches (work here always)
+main    = upstream + our patches (default branch, always deployable)
+dev     = integration branch for new work, merges into main when stable
 ```
 
 **Upgrade flow (when upstream releases):**
 ```bash
-git checkout dev
 git fetch upstream
+git checkout main
 git merge upstream/main
 # resolve conflicts (generate-models.ts most likely)
 bun run build    # verify
-git push origin dev
-# optionally sync main:
-git checkout main && git merge upstream/main && git push origin main && git checkout dev
+git push origin main
 ```
 
 ---
 
-## Not Tracked Here
+## Extensions
 
-Extensions in `~/.pi/agent/extensions/` are separate git repos — not part of this fork.
+Public extensions live in `extensions/` — tracked in this repo, symlinked from `~/.pi/agent/extensions/`.
+DT-private extensions live in `~/Developer/dt-extensions/` (DT GitLab, separate repo).
