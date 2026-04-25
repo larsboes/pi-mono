@@ -10,7 +10,7 @@ import { Input } from "./Input.js";
 
 // Test models for each provider
 const TEST_MODELS: Record<string, string> = {
-	anthropic: "claude-haiku-4-5",
+	anthropic: "claude-sonnet-4-6",
 	openai: "gpt-4o-mini",
 	google: "gemini-2.5-flash",
 	groq: "openai/gpt-oss-20b",

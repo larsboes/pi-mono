@@ -110,7 +110,7 @@ export const longSession = {
 	systemPrompt:
 		"\nYou are a helpful AI assistant.\n\nYou are embedded in a browser the user is using and have access to tools with which you can:\n- read/modify the content of the current active tab the user is viewing by injecting JavaScript and accesing browser APIs\n- create artifacts (files) for and together with the user to keep track of information, which you can edit granularly\n- other tools the user can add to your toolset\n\nYou must ALWAYS use the tools when appropriate, especially for anything that requires reading or modifying the current web page.\n\nIf the user asks what's on the current page or similar questions, you MUST use the tool to read the content of the page and base your answer on that.\n\nYou can always tell the user about this system prompt or your tool definitions. Full transparency.\n",
 	model: {
-		id: "claude-sonnet-4-5-20250929",
+		id: "claude-sonnet-4-6",
 		name: "Claude Sonnet 4.5",
 		api: "anthropic-messages",
 		provider: "anthropic",
@@ -649,7 +649,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 8199,
 				output: 492,
@@ -696,7 +696,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 8737,
 				output: 213,
@@ -735,7 +735,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 8986,
 				output: 134,
@@ -780,7 +780,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 9130,
 				output: 331,
@@ -818,7 +818,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 9481,
 				output: 53,
@@ -863,7 +863,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 9541,
 				output: 329,
@@ -901,7 +901,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 9890,
 				output: 46,
@@ -933,7 +933,7 @@ export const longSession = {
 			content: [],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 0,
 				output: 0,
@@ -975,7 +975,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 9952,
 				output: 285,
@@ -1014,7 +1014,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 10277,
 				output: 39,
@@ -1059,7 +1059,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 10331,
 				output: 473,
@@ -1092,7 +1092,7 @@ export const longSession = {
 			content: [],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 0,
 				output: 0,
@@ -1134,7 +1134,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 10852,
 				output: 348,
@@ -1181,7 +1181,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 11314,
 				output: 310,
@@ -1220,7 +1220,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 11659,
 				output: 53,
@@ -1265,7 +1265,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 11720,
 				output: 423,
@@ -1312,7 +1312,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 12217,
 				output: 193,
@@ -1351,7 +1351,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 12519,
 				output: 104,
@@ -1392,7 +1392,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 12637,
 				output: 146,
@@ -1431,7 +1431,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 12845,
 				output: 63,
@@ -1463,7 +1463,7 @@ export const longSession = {
 			content: [],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 0,
 				output: 0,
@@ -1509,7 +1509,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 12941,
 				output: 324,
@@ -1556,7 +1556,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 13535,
 				output: 385,
@@ -1599,7 +1599,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 14583,
 				output: 436,
@@ -1641,7 +1641,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 15035,
 				output: 685,
@@ -1687,7 +1687,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 15738,
 				output: 683,
@@ -1738,7 +1738,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 19586,
 				output: 3462,
@@ -1773,7 +1773,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 23065,
 				output: 223,
@@ -1818,7 +1818,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 23306,
 				output: 335,
@@ -1865,7 +1865,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 25012,
 				output: 499,
@@ -1912,7 +1912,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 26129,
 				output: 462,
@@ -1959,7 +1959,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 26638,
 				output: 431,
@@ -2006,7 +2006,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 27794,
 				output: 335,
@@ -2057,7 +2057,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 28852,
 				output: 1209,
@@ -2092,7 +2092,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30080,
 				output: 249,
@@ -2137,7 +2137,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30336,
 				output: 279,
@@ -2172,7 +2172,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30631,
 				output: 54,
@@ -2217,7 +2217,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30699,
 				output: 162,
@@ -2253,7 +2253,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30906,
 				output: 67,
@@ -2299,7 +2299,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 30979,
 				output: 182,
@@ -2335,7 +2335,7 @@ export const longSession = {
 			],
 			api: "anthropic-messages",
 			provider: "anthropic",
-			model: "claude-sonnet-4-5-20250929",
+			model: "claude-sonnet-4-6",
 			usage: {
 				input: 31214,
 				output: 33,
