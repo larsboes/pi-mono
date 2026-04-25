@@ -76,7 +76,18 @@ git push origin main
 
 ---
 
-## Extensions
+## Additive Directories (no upstream conflict risk)
 
-Public extensions live in `extensions/` — tracked in this repo, symlinked from `~/.pi/agent/extensions/`.
-Private extensions live in a separate private repo, symlinked into `~/.pi/agent/extensions/` alongside the public ones.
+These are entirely new — upstream has nothing in these paths, so they never conflict on merge.
+
+| Directory | Purpose |
+|-----------|---------|
+| `extensions/` | 9 public pi extensions (swarm, stats, cortex, mitsupi, pai, buddy, mcp-adapter, web-access, markdown-preview) |
+| `add-docs/` | Fork-specific documentation (architecture.md, extensions.md) |
+| `scripts/link-extensions.sh` | Setup script — symlinks extensions + unified memory to `~/.pi/` and `~/.pai/` |
+| `ADDITIONS.md` | This file |
+| `PLAN.md` | Planned work (pi_agent_rust conformance, omp mining, unified stats, swarm testing) |
+
+See `extensions/README.md` for attribution and `add-docs/` for architecture details.
+
+Private DT extensions live in a separate repo (`dt-extensions`), symlinked alongside public ones.
