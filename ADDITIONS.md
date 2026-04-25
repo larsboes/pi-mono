@@ -41,7 +41,7 @@ Keep this file updated when adding patches or merging upstream.
 
 **What:** Removed/stubbed the external API calls to `models.dev` and OpenRouter during build.
 
-**Why:** DT's Zscaler proxy blocks those endpoints. Upstream catalog in git is sufficient — models are registered via extensions (`bedrock-eu`, `dt-llmchat`) not the generated catalog.
+**Why:** External catalog fetches fail behind corporate proxies. Upstream catalog in git is sufficient — models are registered via extensions, not the generated catalog.
 
 **Conflict risk on upstream merge:** High — upstream actively maintains model catalog generation. Re-apply after every upstream merge.
 
@@ -69,4 +69,4 @@ git push origin main
 ## Extensions
 
 Public extensions live in `extensions/` — tracked in this repo, symlinked from `~/.pi/agent/extensions/`.
-DT-private extensions live in `~/Developer/dt-extensions/` (DT GitLab, separate repo).
+Private extensions live in a separate private repo, symlinked into `~/.pi/agent/extensions/` alongside the public ones.
