@@ -1,7 +1,5 @@
-/**
- * Agent persona loader — reads .md files with frontmatter
- */
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 export interface AgentPersona {
 	name: string;
@@ -17,9 +15,7 @@ function parseFrontmatter(content: string): { meta: Record<string, string>; body
 	const meta: Record<string, string> = {};
 	for (const line of match[1].split("\n")) {
 		const i = line.indexOf(":");
-		if (i > 0) {
-			meta[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
-		}
+		if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
 	}
 	return { meta, body: match[2] };
 }
@@ -28,17 +24,17 @@ export function loadPersona(filePath: string, fallbackName: string, fallbackColo
 	if (!fs.existsSync(filePath)) {
 		return {
 			name: fallbackName,
-			description: `${fallbackName} board member`,
-			model: "anthropic/claude-sonnet-4-20250514",
+			description: `${fallbackName} agent`,
+			model: "",
 			color: fallbackColor,
-			systemPrompt: `You are ${fallbackName}, an advisory board member.`,
+			systemPrompt: `You are ${fallbackName}.`,
 		};
 	}
 	const { meta, body } = parseFrontmatter(fs.readFileSync(filePath, "utf-8"));
 	return {
 		name: meta.name || fallbackName,
-		description: meta.description || `${fallbackName} board member`,
-		model: meta.model || "anthropic/claude-sonnet-4-20250514",
+		description: meta.description || `${fallbackName} agent`,
+		model: meta.model || "",
 		color: meta.color || fallbackColor,
 		systemPrompt: body.trim(),
 	};
@@ -46,7 +42,7 @@ export function loadPersona(filePath: string, fallbackName: string, fallbackColo
 
 export function loadExpertise(filePath: string | undefined, baseDir: string): string {
 	if (!filePath) return "";
-	const resolved = filePath.startsWith("/") ? filePath : `${baseDir}/${filePath}`;
+	const resolved = filePath.startsWith("/") ? filePath : path.join(baseDir, filePath);
 	if (!fs.existsSync(resolved)) return "";
 	return fs.readFileSync(resolved, "utf-8");
 }
@@ -55,13 +51,11 @@ export function loadSkills(skillPaths: string[] | undefined, baseDir: string): s
 	if (!skillPaths || skillPaths.length === 0) return "";
 	const blocks: string[] = [];
 	for (const sp of skillPaths) {
-		const resolved = sp.startsWith("/") ? sp : `${baseDir}/${sp}`;
+		const resolved = sp.startsWith("/") ? sp : path.join(baseDir, sp);
 		if (fs.existsSync(resolved)) {
-			const content = fs.readFileSync(resolved, "utf-8");
-			// Strip frontmatter from skill
-			const { body } = parseFrontmatter(content);
+			const { body } = parseFrontmatter(fs.readFileSync(resolved, "utf-8"));
 			blocks.push(body.trim());
 		}
 	}
-	return blocks.length > 0 ? blocks.join("\n\n---\n\n") : "";
+	return blocks.join("\n\n---\n\n");
 }

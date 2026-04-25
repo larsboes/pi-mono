@@ -17,8 +17,8 @@ Personal utility extensions for pi — loop control, file ops, context injection
 ### pai
 PAI statusline and skill integration for pi — HUD widget showing active session, skill inventory, and PAI system stats. Original work.
 
-### ceo-board
-Multi-agent strategic council — CEO and specialist agents (contrarian, moonshot, product, revenue, tech) debate decisions via pi's subagent system. Evolved from an earlier `pai-council` prototype. Original work.
+### swarm
+Unified multi-agent orchestration — unattended YAML DAG pipelines AND interactive CEO & Board deliberation in one extension. Supports parallel fan-outs, sequential chains, iterative pipelines, dialogue mode with shared transcript, budget/time constraints, persona files, brief management, memo output. DAG engine ported from [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) `packages/swarm-extension`. Interactive deliberation evolved from the earlier `ceo-board` extension (original work).
 
 ### buddy
 Companion display extension — sprite-based UI companion and display utilities. Original work.
