@@ -5,10 +5,22 @@ import {
 	getRecentErrors as dbGetRecentErrors, getRecentRequests as dbGetRecentRequests,
 	getStatsByFolder, getStatsByModel, getTimeSeries, initDb, insertMessageStats, setFileOffset,
 } from "./db";
-import { getSessionEntry, listAllSessionFiles, parseSessionFile } from "./parser";
-import type { DashboardStats, MessageStats, RequestDetails } from "./types";
+import * as piParser from "./parsers/pi";
+import * as ccParser from "./parsers/claude-code";
+import type { DashboardStats, MessageStats, RequestDetails, StatsSource } from "./types";
 
-async function syncSessionFile(sessionFile: string): Promise<number> {
+type Parser = {
+	parseSessionFile: (path: string, fromOffset?: number) => Promise<{ stats: MessageStats[]; newOffset: number }>;
+	listAllSessionFiles: () => Promise<string[]>;
+	getSessionEntry: (path: string, entryId: string) => Promise<unknown | null>;
+};
+
+const parsers: Record<StatsSource, Parser> = {
+	pi: piParser as Parser,
+	"claude-code": ccParser as Parser,
+};
+
+async function syncSessionFile(parser: Parser, sessionFile: string): Promise<number> {
 	let fileStats: fs.Stats;
 	try { fileStats = await fs.promises.stat(sessionFile); } catch { return 0; }
 
@@ -17,33 +29,40 @@ async function syncSessionFile(sessionFile: string): Promise<number> {
 	if (stored && stored.lastModified >= lastModified) return 0;
 
 	const fromOffset = stored?.offset ?? 0;
-	const { stats, newOffset } = await parseSessionFile(sessionFile, fromOffset);
+	const { stats, newOffset } = await parser.parseSessionFile(sessionFile, fromOffset);
 	if (stats.length > 0) insertMessageStats(stats);
 	setFileOffset(sessionFile, newOffset, lastModified);
 	return stats.length;
 }
 
-export async function syncAllSessions(): Promise<{ processed: number; files: number }> {
+export async function syncAllSessions(): Promise<{ processed: number; files: number; bySource: Record<string, number> }> {
 	await initDb();
-	const files = await listAllSessionFiles();
 	let totalProcessed = 0, filesProcessed = 0;
-	for (const file of files) {
-		const count = await syncSessionFile(file);
-		if (count > 0) { totalProcessed += count; filesProcessed++; }
+	const bySource: Record<string, number> = {};
+
+	for (const [sourceName, parser] of Object.entries(parsers)) {
+		const files = await parser.listAllSessionFiles();
+		let sourceCount = 0;
+		for (const file of files) {
+			const count = await syncSessionFile(parser, file);
+			if (count > 0) { totalProcessed += count; filesProcessed++; sourceCount += count; }
+		}
+		bySource[sourceName] = sourceCount;
 	}
-	return { processed: totalProcessed, files: filesProcessed };
+
+	return { processed: totalProcessed, files: filesProcessed, bySource };
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export async function getDashboardStats(sinceTs?: number): Promise<DashboardStats> {
 	await initDb();
 	return {
-		overall: getOverallStats(),
-		byModel: getStatsByModel(),
-		byFolder: getStatsByFolder(),
-		timeSeries: getTimeSeries(24),
-		modelSeries: getModelTimeSeries(14),
-		modelPerformanceSeries: getModelPerformanceSeries(14),
-		costSeries: getCostTimeSeries(90),
+		overall: getOverallStats(sinceTs),
+		byModel: getStatsByModel(sinceTs),
+		byFolder: getStatsByFolder(sinceTs),
+		timeSeries: getTimeSeries(24, sinceTs),
+		modelSeries: getModelTimeSeries(14, sinceTs),
+		modelPerformanceSeries: getModelPerformanceSeries(14, sinceTs),
+		costSeries: getCostTimeSeries(90, sinceTs),
 	};
 }
 
@@ -61,9 +80,14 @@ export async function getRequestDetails(id: number): Promise<RequestDetails | nu
 	await initDb();
 	const msg = getMessageById(id);
 	if (!msg) return null;
-	const entry = await getSessionEntry(msg.sessionFile, msg.entryId);
-	if (!entry || entry.type !== "message") return null;
-	return { ...msg, messages: [entry], output: (entry as any).message };
+	const parser = parsers[msg.source ?? "pi"];
+	if (!parser) return null;
+	const entry = await parser.getSessionEntry(msg.sessionFile, msg.entryId);
+	if (!entry) return null;
+	// pi entries have .type === "message"; CC entries have .type === "assistant".
+	// Normalize output so downstream keeps working.
+	const e = entry as { type?: string; message?: unknown };
+	return { ...msg, messages: [entry], output: e.message ?? entry };
 }
 
 export async function getTotalMessageCount(): Promise<number> {

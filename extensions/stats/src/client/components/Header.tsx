@@ -2,16 +2,29 @@ import { Activity, RefreshCw } from "lucide-react";
 
 type Tab = "overview" | "requests" | "errors" | "models" | "costs";
 
+export type RangeKey = "all" | "90d" | "30d" | "7d" | "24h";
+
+export const RANGE_MS: Record<RangeKey, number | null> = {
+	all: null,
+	"90d": 90 * 86400000,
+	"30d": 30 * 86400000,
+	"7d": 7 * 86400000,
+	"24h": 24 * 3600000,
+};
+
 interface HeaderProps {
 	activeTab: Tab;
 	onTabChange: (tab: Tab) => void;
 	onSync: () => void;
 	syncing: boolean;
+	activeRange: RangeKey;
+	onRangeChange: (range: RangeKey) => void;
 }
 
 const tabs: Tab[] = ["overview", "requests", "errors", "models", "costs"];
+const ranges: RangeKey[] = ["all", "90d", "30d", "7d", "24h"];
 
-export function Header({ activeTab, onTabChange, onSync, syncing }: HeaderProps) {
+export function Header({ activeTab, onTabChange, onSync, syncing, activeRange, onRangeChange }: HeaderProps) {
 	return (
 		<header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-[var(--border-subtle)]">
 			<div className="flex items-center gap-3">
@@ -24,7 +37,21 @@ export function Header({ activeTab, onTabChange, onSync, syncing }: HeaderProps)
 				</div>
 			</div>
 
-			<div className="flex items-center gap-3">
+			<div className="flex items-center gap-3 flex-wrap">
+				<div className="flex bg-[var(--bg-surface)] rounded-[var(--radius-md)] p-1 border border-[var(--border-subtle)]">
+					{ranges.map(r => (
+						<button
+							key={r}
+							type="button"
+							onClick={() => onRangeChange(r)}
+							className={`tab-btn uppercase ${activeRange === r ? "active" : ""}`}
+							title={r === "all" ? "All time" : `Last ${r}`}
+						>
+							{r}
+						</button>
+					))}
+				</div>
+
 				<div className="flex bg-[var(--bg-surface)] rounded-[var(--radius-md)] p-1 border border-[var(--border-subtle)]">
 					{tabs.map(tab => (
 						<button

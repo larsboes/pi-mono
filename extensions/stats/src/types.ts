@@ -2,11 +2,14 @@ import type { Usage } from "@mariozechner/pi-ai";
 
 export type StopReason = "end_turn" | "max_tokens" | "tool_use" | "error" | "cancelled" | string;
 
+export type StatsSource = "pi" | "claude-code";
+
 export interface MessageStats {
 	id?: number;
 	sessionFile: string;
 	entryId: string;
 	folder: string;
+	source: StatsSource;
 	model: string;
 	provider: string;
 	api: string;
@@ -45,6 +48,7 @@ export interface AggregatedStats {
 export interface ModelStats extends AggregatedStats {
 	model: string;
 	provider: string;
+	source: StatsSource;
 }
 
 export interface FolderStats extends AggregatedStats {

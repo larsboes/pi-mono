@@ -1,11 +1,27 @@
-import { Activity, AlertCircle, BarChart3, Database, Server, Star, Zap } from "lucide-react";
+import { Activity, AlertCircle, BarChart3, CalendarRange, Database, Server, Star, Zap } from "lucide-react";
 import type { AggregatedStats } from "../types";
+
+function formatRange(first: number, last: number): { value: string; detail: string } {
+	if (!first || !last) return { value: "-", detail: "no data" };
+	const spanMs = last - first;
+	const days = Math.max(1, Math.round(spanMs / 86400000));
+	const fmt = (ts: number) => new Date(ts).toISOString().slice(0, 10);
+	return { value: `${days}d`, detail: `${fmt(first)} → ${fmt(last)}` };
+}
 
 interface StatsGridProps {
 	stats: AggregatedStats;
 }
 
 const statConfig = [
+	{
+		key: "range",
+		title: "Data Range",
+		icon: CalendarRange,
+		color: "var(--accent-cyan)",
+		getValue: (s: AggregatedStats) => formatRange(s.firstTimestamp, s.lastTimestamp).value,
+		getDetail: (s: AggregatedStats) => formatRange(s.firstTimestamp, s.lastTimestamp).detail,
+	},
 	{
 		key: "requests",
 		title: "Total Requests",
@@ -69,7 +85,7 @@ const statConfig = [
 
 export function StatsGrid({ stats }: StatsGridProps) {
 	return (
-		<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 mb-8">
+		<div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
 			{statConfig.map(stat => {
 				const Icon = stat.icon;
 				return (

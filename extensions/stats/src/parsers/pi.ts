@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { MessageStats, SessionEntry, SessionMessageEntry } from "./types";
+import type { MessageStats, SessionEntry, SessionMessageEntry } from "../types";
 
 const SESSIONS_DIR = path.join(os.homedir(), ".pi", "agent", "sessions");
 
@@ -24,6 +24,7 @@ function extractStats(sessionFile: string, folder: string, entry: SessionMessage
 		sessionFile,
 		entryId: entry.id,
 		folder,
+		source: "pi",
 		model: (msg.model as string) ?? "unknown",
 		provider: (msg.provider as string) ?? "unknown",
 		api: (msg.api as string) ?? "unknown",
@@ -34,7 +35,7 @@ function extractStats(sessionFile: string, folder: string, entry: SessionMessage
 		errorMessage: (msg.errorMessage as string | undefined) ?? null,
 		usage: (msg.usage as MessageStats["usage"]) ?? {
 			input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
-			premiumRequests: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 		},
 	};
 }

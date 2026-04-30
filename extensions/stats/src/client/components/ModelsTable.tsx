@@ -97,12 +97,15 @@ export function ModelsTable({ models, performanceSeries }: ModelsTableProps) {
 
 				<div className="max-h-[calc(100vh-300px)] overflow-y-auto">
 					{sortedModels.map((model, index) => {
-						const key = `${model.model}::${model.provider}`;
-						const performance = performanceSeriesByKey.get(key);
+						const source = model.source ?? "pi";
+						const key = `${model.model}::${model.provider}::${source}`;
+						const performance = performanceSeriesByKey.get(`${model.model}::${model.provider}`);
 						const trendData = performance?.data ?? [];
 						const trendColor = MODEL_COLORS[index % MODEL_COLORS.length];
 						const isExpanded = expandedKey === key;
 						const errorRate = model.errorRate * 100;
+						const sourceBadge = source === "claude-code" ? "CC" : "pi";
+						const sourceColor = source === "claude-code" ? "bg-orange-500/20 text-orange-300" : "bg-blue-500/20 text-blue-300";
 
 						return (
 							<div key={key} className="border-t border-[var(--border-subtle)]">
@@ -116,7 +119,10 @@ export function ModelsTable({ models, performanceSeries }: ModelsTableProps) {
 										style={{ gridTemplateColumns: "2fr 0.9fr 0.9fr 1fr 0.8fr 0.8fr 140px 40px" }}
 									>
 										<div>
-											<div className="font-medium text-[var(--text-primary)]">{model.model}</div>
+											<div className="font-medium text-[var(--text-primary)] flex items-center gap-2">
+												{model.model}
+												<span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${sourceColor}`}>{sourceBadge}</span>
+											</div>
 											<div className="text-xs text-[var(--text-muted)]">{model.provider}</div>
 										</div>
 										<div className="text-right text-[var(--text-secondary)] font-mono text-sm">

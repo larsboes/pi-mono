@@ -2,8 +2,9 @@ import type { DashboardStats, MessageStats, RequestDetails } from "./types";
 
 const API_BASE = "/api";
 
-export async function getStats(): Promise<DashboardStats> {
-	const res = await fetch(`${API_BASE}/stats`);
+export async function getStats(sinceTs?: number): Promise<DashboardStats> {
+	const url = sinceTs !== undefined ? `${API_BASE}/stats?since=${sinceTs}` : `${API_BASE}/stats`;
+	const res = await fetch(url);
 	if (!res.ok) throw new Error("Failed to fetch stats");
 	return res.json() as Promise<DashboardStats>;
 }

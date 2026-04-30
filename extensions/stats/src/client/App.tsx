@@ -3,7 +3,7 @@ import { getRecentErrors, getRecentRequests, getStats, sync } from "./api";
 import { ChartsContainer } from "./components/ChartsContainer";
 import { CostChart } from "./components/CostChart";
 import { CostSummary } from "./components/CostSummary";
-import { Header } from "./components/Header";
+import { Header, RANGE_MS, type RangeKey } from "./components/Header";
 import { ModelsTable } from "./components/ModelsTable";
 import { RequestDetail } from "./components/RequestDetail";
 import { RequestList } from "./components/RequestList";
@@ -19,17 +19,20 @@ export default function App() {
 	const [selectedRequest, setSelectedRequest] = useState<number | null>(null);
 	const [syncing, setSyncing] = useState(false);
 	const [activeTab, setActiveTab] = useState<Tab>("overview");
+	const [activeRange, setActiveRange] = useState<RangeKey>("all");
 
 	const loadData = useCallback(async () => {
 		try {
-			const [s, r, e] = await Promise.all([getStats(), getRecentRequests(50), getRecentErrors(50)]);
+			const windowMs = RANGE_MS[activeRange];
+			const sinceTs = windowMs === null ? undefined : Date.now() - windowMs;
+			const [s, r, e] = await Promise.all([getStats(sinceTs), getRecentRequests(50), getRecentErrors(50)]);
 			setStats(s);
 			setRecentRequests(r);
 			setRecentErrors(e);
 		} catch (err) {
 			console.error(err);
 		}
-	}, []);
+	}, [activeRange]);
 
 	const handleSync = async () => {
 		setSyncing(true);
@@ -61,7 +64,14 @@ export default function App() {
 	return (
 		<div className="min-h-screen">
 			<div className="max-w-[1600px] mx-auto px-6 py-6">
-				<Header activeTab={activeTab} onTabChange={setActiveTab} onSync={handleSync} syncing={syncing} />
+				<Header
+					activeTab={activeTab}
+					onTabChange={setActiveTab}
+					onSync={handleSync}
+					syncing={syncing}
+					activeRange={activeRange}
+					onRangeChange={setActiveRange}
+				/>
 
 				{activeTab === "overview" && (
 					<div className="space-y-6 animate-fade-in">

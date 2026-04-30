@@ -171,7 +171,9 @@ async function handleApi(req: Request): Promise<Response> {
 	await syncAllSessions();
 
 	if (path === "/api/stats") {
-		const stats = await getDashboardStats();
+		const sinceRaw = url.searchParams.get("since");
+		const sinceTs = sinceRaw ? parseInt(sinceRaw, 10) : undefined;
+		const stats = await getDashboardStats(sinceTs && Number.isFinite(sinceTs) ? sinceTs : undefined);
 		return Response.json(stats);
 	}
 
