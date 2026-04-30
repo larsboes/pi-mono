@@ -43,6 +43,7 @@ const LOCATION_CACHE = join(CACHE_DIR, "location-cache.json");
 const WEATHER_CACHE = join(CACHE_DIR, "weather-cache.txt");
 const CC_SETTINGS = join(HOME, ".claude", "settings.json");
 const CC_MEMORY_DIR = join(HOME, ".claude", "MEMORY");
+const MEMORY_LANE_LOCK = join(PAI_DIR, ".memory-lane.lock");
 const LOCATION_TTL = 3600_000; // 1 hour
 const WEATHER_TTL = 900_000; // 15 min
 
@@ -236,6 +237,24 @@ function getAlgoVersion(): string {
 		return settings?.pai?.algorithmVersion || "—";
 	} catch {
 		return "—";
+	}
+}
+
+interface MemoryLaneInfo {
+	lane: string;           // e.g. "external", "internal", or any custom name
+	label?: string;         // display label (optional, falls back to uppercased lane)
+	icon?: string;          // display icon (optional, falls back to generic 🌐)
+	restricted?: boolean;   // true = use warning color, false = normal
+}
+
+function getMemoryLane(): MemoryLaneInfo | undefined {
+	try {
+		const raw = readFileSync(MEMORY_LANE_LOCK, "utf-8");
+		const lock = JSON.parse(raw);
+		if (lock.pid !== process.pid) return undefined;
+		return { lane: lock.lane, label: lock.label, icon: lock.icon, restricted: lock.restricted };
+	} catch {
+		return undefined;
 	}
 }
 
@@ -439,13 +458,20 @@ function buildWidget(ctx: ExtensionContext): string[] {
 	const lines: string[] = [];
 	const paiBrand = `${paiP("P")}${paiA("A")}${paiI("I")}`;
 
-	// Line 1: Header + time + weather
+	// Line 1: Header + lane + time + weather
 	const time = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 	const weather = cachedWeather || "";
-	const headerRight = [paiA(time)];
+	const lane = getMemoryLane();
+	const lanePill = (() => {
+		if (!lane) return slate500("◌ NO-LANE");
+		const icon = lane.icon ?? (lane.restricted ? "🔒" : "🌐");
+		const label = lane.label ?? lane.lane.toUpperCase();
+		return lane.restricted ? rose(`${icon} ${label}`) : emerald(`${icon} ${label}`);
+	})();
+	const headerRight = [lanePill, paiA(time)];
 	if (weather) headerRight.push(weatherBlue(weather));
 	lines.push(
-		`${slate600("── │")} ${paiBrand} ${paiA("STATUSLINE")} ${slate600("│")} ${headerRight.join(` ${SEP} `)} ${slate600("──────────────────────────────────────")}`
+		`${slate600("── │")} ${paiBrand} ${paiA("STATUSLINE")} ${slate600("│")} ${headerRight.join(` ${SEP} `)} ${slate600("─────────────────────────────")}`
 	);
 
 	// Line 3: ENV — versions + counts

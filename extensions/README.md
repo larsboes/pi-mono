@@ -2,7 +2,8 @@
 
 Public pi extensions. Each is symlinked from `~/.pi/agent/extensions/` into this directory.
 
-DT-private extensions (dt-models, tardis, telecontext-auth) live in a separate private repo.
+Additional private extensions (work-specific providers and auth helpers) live
+in a separate private repo and are not part of this open-source fork.
 
 ---
 

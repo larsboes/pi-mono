@@ -100,4 +100,5 @@ These are entirely new — upstream has nothing in these paths, so they never co
 
 See `extensions/README.md` for attribution and `add-docs/` for architecture details.
 
-Private DT extensions live in a separate repo (`dt-extensions`), symlinked alongside public ones.
+Work-specific private extensions live in a separate repo and are symlinked
+alongside the public ones at install time.
