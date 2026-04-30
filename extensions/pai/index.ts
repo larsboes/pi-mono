@@ -532,6 +532,40 @@ function buildWidget(ctx: ExtensionContext): string[] {
 	return lines;
 }
 
+// ── TELOS context injection ──────────────────────────────────────────────────
+// Reads $VAULT_PATH/Atlas/TELOS/TELOS.md and prepends it to the system prompt
+// as a <system-reminder>. Mirrors the Claude Code LoadContext hook behavior.
+// VAULT_PATH points at whichever vault this machine uses (work vs personal).
+
+function loadTelosContext(): string | null {
+	const vaultPath = process.env.VAULT_PATH;
+	if (!vaultPath) return null;
+	const telosPath = join(vaultPath, "Atlas/TELOS/TELOS.md");
+	if (!existsSync(telosPath)) {
+		if (process.env.DEBUG) console.error(`[pai] TELOS not found at ${telosPath}`);
+		return null;
+	}
+	try {
+		const content = readFileSync(telosPath, "utf-8").trim();
+		if (process.env.DEBUG) console.error(`[pai] Loaded TELOS from vault (${content.length} chars)`);
+		return content;
+	} catch (err) {
+		if (process.env.DEBUG) console.error(`[pai] Failed to load TELOS: ${err}`);
+		return null;
+	}
+}
+
+// Cache TELOS for the session — read once per pi session, not per turn.
+// Invalidated only on pi restart.
+let cachedTelos: string | null | undefined = undefined;
+
+function telosSystemPromptAddition(existingPrompt: string): string {
+	if (cachedTelos === undefined) cachedTelos = loadTelosContext();
+	if (!cachedTelos) return existingPrompt;
+	const block = `\n\n<system-reminder>\n${cachedTelos}\n</system-reminder>\n`;
+	return existingPrompt + block;
+}
+
 // ── Status line (footer) ─────────────────────────────────────────────────────
 
 // Footer status removed — pi's native status bar already shows model, cost, context%, turns
@@ -580,6 +614,14 @@ export default function pai(pi: ExtensionAPI) {
 
 	pi.on("model_select", async (_event, ctx) => {
 		refresh(ctx);
+	});
+
+	// Inject TELOS from the vault into the system prompt on every agent turn.
+	// Reads once per session, caches for the rest of the session.
+	pi.on("before_agent_start", async (event) => {
+		const newPrompt = telosSystemPromptAddition(event.systemPrompt);
+		if (newPrompt === event.systemPrompt) return;
+		return { systemPrompt: newPrompt };
 	});
 
 	pi.registerCommand("pai", {
