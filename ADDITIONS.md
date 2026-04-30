@@ -37,13 +37,23 @@ Keep this file updated when adding patches or merging upstream.
 
 ---
 
-### 4. `packages/ai/scripts/generate-models.ts` — Skip external model catalog fetch
+### 4. `packages/ai/scripts/generate-models.ts` — `PI_SKIP_MODEL_FETCH` escape hatch
 
-**What:** Removed/stubbed the external API calls to `models.dev` and OpenRouter during build.
+**What:** At the top of `generateModels()`, if `PI_SKIP_MODEL_FETCH=1` is set, the
+function returns immediately without fetching from models.dev / OpenRouter /
+Vercel AI Gateway and without touching `models.generated.ts`.
 
-**Why:** External catalog fetches fail behind corporate proxies. Upstream catalog in git is sufficient — models are registered via extensions, not the generated catalog.
+**Why:** Behind corporate proxies these fetches time out, and the default behavior
+is to write a **truncated** catalog (we saw 703 lines vs. 15,660), which then
+breaks the type system in `models.ts` via `TProvider` indexing. The escape hatch
+preserves the committed catalog on failing networks.
 
-**Conflict risk on upstream merge:** High — upstream actively maintains model catalog generation. Re-apply after every upstream merge.
+**How to use:** `export PI_SKIP_MODEL_FETCH=1` in your shell (or prefix a single
+build: `PI_SKIP_MODEL_FETCH=1 bun run build`). On a network that can reach the
+catalogs, leave it unset to refresh the file.
+
+**Conflict risk on upstream merge:** Low — the guard is prepended inside
+`generateModels()`; the rest of the function is untouched.
 
 ---
 

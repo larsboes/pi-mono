@@ -742,6 +742,15 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 }
 
 async function generateModels() {
+	// When running behind a corporate proxy that can't reach models.dev /
+	// OpenRouter / Vercel AI Gateway, set PI_SKIP_MODEL_FETCH=1 to keep the
+	// existing generated catalog. Without this, fetch timeouts silently truncate
+	// models.generated.ts and break the type system (TProvider indexing in models.ts).
+	if (process.env.PI_SKIP_MODEL_FETCH === "1") {
+		console.log("PI_SKIP_MODEL_FETCH=1 set — skipping external catalog fetch, keeping existing models.generated.ts");
+		return;
+	}
+
 	// Fetch models from both sources
 	// models.dev: Anthropic, Google, OpenAI, Groq, Cerebras
 	// OpenRouter: xAI and other providers (excluding Anthropic, Google, OpenAI)
