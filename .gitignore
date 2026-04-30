@@ -24,6 +24,13 @@ packages/*/dist-firefox/
 .npm/
 coverage/
 .nyc_output/
+
+# Root bun lockfile — repo uses npm workspaces; a root bun.lockb only
+# appears if someone runs `bun` at root by accident and can leak the
+# local registry (e.g. corporate Artifactory URLs) into the public repo.
+/bun.lockb
+/bun.lock
+
 .pi_config/
 tui-debug.log
 compaction-results/

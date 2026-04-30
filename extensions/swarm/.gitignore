@@ -1,0 +1,6 @@
+node_modules/
+
+# User-specific swarm state — never commit these
+.pi/swarm/briefs/
+.pi/swarm/deliberations/
+.pi/swarm/memos/

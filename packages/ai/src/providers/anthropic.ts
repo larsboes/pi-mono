@@ -734,9 +734,13 @@ export const streamSimpleAnthropic: StreamFunction<"anthropic-messages", SimpleS
 	// For Opus 4.6 and Sonnet 4.6: use adaptive thinking with effort level
 	// For older models: use budget-based thinking
 	if (supportsAdaptiveThinking(model.id)) {
+		// Adaptive thinking: the API manages thinking budget internally.
+		// Use the model's full maxTokens so the API has room for both thinking and text output.
+		// The 32k default from buildBaseOptions is too restrictive for 128k-output models.
 		const effort = mapThinkingLevelToEffort(options.reasoning, model.id);
 		return streamAnthropic(model, context, {
 			...base,
+			maxTokens: options?.maxTokens || model.maxTokens,
 			thinkingEnabled: true,
 			effort,
 		} satisfies AnthropicOptions);

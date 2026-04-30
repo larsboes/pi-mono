@@ -1,0 +1,70 @@
+meeting:
+  constraints:
+    max_time_minutes: 5
+    max_budget: $5
+    rounds_hint: 3
+  editor: code
+  brief_required_sections:
+    - situation
+    - stakes
+    - constraints
+    - key question
+
+paths:
+  briefs:        .pi/swarm/briefs/
+  deliberations: .pi/swarm/deliberations/
+  memos:         .pi/swarm/memos/
+  agents:        .pi/swarm/agents/
+  expertise:     .pi/swarm/expertise/
+  skills:        .pi/swarm/skills/
+
+ceo:
+  name: CEO
+  path: .pi/swarm/agents/ceo.md
+  model: $default
+  color: "#7dcfff"
+  expertise: .pi/swarm/expertise/ceo-scratch-pad.md
+  skills:
+    - .pi/swarm/skills/mental-model.md
+
+board:
+  - name: Revenue
+    path: .pi/swarm/agents/revenue.md
+    model: $default
+    color: "#ff7edb"
+    expertise: .pi/swarm/expertise/revenue.md
+    skills:
+      - .pi/swarm/skills/mental-model.md
+
+  - name: Technical Architect
+    path: .pi/swarm/agents/tech-architect.md
+    model: $default
+    color: "#ff6e96"
+    expertise: .pi/swarm/expertise/tech-architect.md
+    skills:
+      - .pi/swarm/skills/mental-model.md
+
+  - name: Product Strategist
+    path: .pi/swarm/agents/product-strategist.md
+    model: $default
+    color: "#fede5d"
+    expertise: .pi/swarm/expertise/product-strategist.md
+    skills:
+      - .pi/swarm/skills/mental-model.md
+
+  - name: Contrarian
+    path: .pi/swarm/agents/contrarian.md
+    model: $default
+    color: "#ff9e64"
+    expertise: .pi/swarm/expertise/contrarian.md
+    skills:
+      - .pi/swarm/skills/adversarial-analysis.md
+      - .pi/swarm/skills/mental-model.md
+
+  - name: Moonshot
+    path: .pi/swarm/agents/moonshot.md
+    model: $default
+    color: "#72f1b8"
+    expertise: .pi/swarm/expertise/moonshot.md
+    skills:
+      - .pi/swarm/skills/mental-model.md

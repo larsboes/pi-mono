@@ -322,6 +322,7 @@ export const streamSimpleBedrock: StreamFunction<"bedrock-converse-stream", Simp
 		if (supportsAdaptiveThinking(model.id, model.name)) {
 			return streamBedrock(model, context, {
 				...base,
+				maxTokens: options?.maxTokens || model.maxTokens,
 				reasoning: options.reasoning,
 				thinkingBudgets: options.thinkingBudgets,
 			} satisfies BedrockOptions);

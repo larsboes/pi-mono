@@ -14,6 +14,18 @@ const MAX_NAME_LENGTH = 64;
 /** Max description length per spec */
 const MAX_DESCRIPTION_LENGTH = 1024;
 
+/**
+ * Normalize a skill name to kebab-case.
+ * Handles: TitleCase, PascalCase, camelCase, ALLCAPS with boundaries.
+ * Examples: "RedTeam" → "red-team", "OSINT" → "osint", "USMetrics" → "us-metrics"
+ */
+function toKebabCase(name: string): string {
+	return name
+		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+		.toLowerCase();
+}
+
 const IGNORE_FILE_NAMES = [".gitignore", ".ignore", ".fdignore"];
 
 type IgnoreMatcher = ReturnType<typeof ignore>;
@@ -298,10 +310,11 @@ function loadSkillFromFile(
 		}
 
 		// Use name from frontmatter, or fall back to parent directory name
-		const name = frontmatter.name || parentDirName;
+		// Normalize to kebab-case for validation (supports TitleCase/PascalCase skill names)
+		const name = toKebabCase(frontmatter.name || parentDirName);
 
-		// Validate name
-		const nameErrors = validateName(name, parentDirName);
+		// Validate name (compare against normalized parent dir name too)
+		const nameErrors = validateName(name, toKebabCase(parentDirName));
 		for (const error of nameErrors) {
 			diagnostics.push({ type: "warning", message: error, path: filePath });
 		}
