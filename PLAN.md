@@ -4,7 +4,8 @@
 
 ## 1. pi_agent_rust — Conformance Validation
 
-**Status:** Planned
+**Status:** Done (2026-04-30)
+**Outcome:** Hold migration. Blockers: (1) wasmtime 41.0.4 has 11 CVEs incl. 1 CVSS 9 critical sandbox escape (upstream fix needs wasmtime ≥42.0.2); (2) custom provider registration path unverified end-to-end; (3) mitsupi uses `node:net` which pi-rust forbids — needs refactor to `fetch` / `pi.http`. Re-check monthly via `cargo audit`.
 **Priority:** High (evaluate before next upstream merge cycle)
 **Effort:** Standard (~2h)
 **Reference:** `~/Developer/pi-ideas/pi_agent_rust/`
