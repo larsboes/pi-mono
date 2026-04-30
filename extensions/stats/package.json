@@ -1,17 +1,19 @@
 {
-  "name": "@larsboes/pi-stats",
-  "version": "1.0.0",
-  "description": "Local observability dashboard for pi AI usage statistics",
+  "name": "pi-stats",
+  "version": "1.1.0",
+  "description": "Unified AI usage dashboard (pi + Claude Code sessions)",
   "type": "module",
+  "main": "./src/index.ts",
   "bin": {
-    "pi-stats": "./src/index.ts"
+    "pi-stats": "./src/cli.ts"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
+    "dev": "bun run src/cli.ts",
     "build:client": "bun run build-client.ts"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
     "chart.js": "^4.4.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.469.0",
