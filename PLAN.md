@@ -100,17 +100,30 @@ Add Claude Code session parsing to stats so `~/.pai/stats.db` covers all AI agen
 
 ## 4. Swarm — Interactive Dialogue Testing
 
-**Status:** Planned
+**Status:** Partial — static validated, manual checklist ready (2026-04-30)
 **Priority:** Medium
 **Effort:** Standard (~2h)
 
-The swarm/ceo-board merge is code-complete but the interactive deliberation path (`/swarm begin`) hasn't been tested with a live pi session. Need to:
+### Done (automated)
 
-1. Run `/swarm begin` in pi, select a brief, verify CEO session takeover works
-2. Verify `converse()` tool calls board agents and returns responses
-3. Verify `end_deliberation()` writes transcript + memo
-4. Verify session auto-reverts after memo is written
-5. Test `/swarm quick <topic>` for one-shot parallel debate
-6. Test `/swarm run` with a simple pipeline YAML
+- Extension loads cleanly with mock `ExtensionAPI`: registers 1 slash command
+  (`/swarm`), 2 tools (`converse`, `end_deliberation`), 2 message renderers,
+  6 lifecycle listeners.
+- Non-interactive subcommands (`/swarm`, `/swarm list`, `/swarm status`,
+  `/swarm stop`, `/swarm view`) verified to dispatch without crashing via
+  mocked context. Each returns a sensible message.
 
-Document any issues in `add-docs/swarm-testing.md`.
+### Open (requires live pi session)
+
+`/swarm begin`, `/swarm quick`, and `/swarm run` invoke the real
+`modelRegistry` + API keys and cannot be validated headlessly without
+becoming theater. See `add-docs/swarm-testing.md` for a full manual
+checklist covering:
+
+1. `/swarm quick <topic>` — lightest path, parallel debate, ≥3 responses
+2. `/swarm begin` — brief editor → CEO session → `converse()` →
+   `end_deliberation()` → auto-revert
+3. `/swarm stop` — mid-deliberation abort + session restore
+4. `/swarm run <yaml>` — unattended pipeline with DAG execution
+
+Mark item 4 complete in PLAN when the manual checklist passes end-to-end.
