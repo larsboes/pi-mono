@@ -26,7 +26,10 @@ interface ScopedModelItem {
 	thinkingLevel?: string;
 }
 
-type ModelScope = "all" | "scoped";
+// Categories: "all" + each provider, plus "scoped" when scopedModels was provided.
+type ModelCategory = string;
+const CATEGORY_ALL = "all";
+const CATEGORY_SCOPED = "scoped";
 
 /**
  * Component that renders a model selector with search
@@ -57,9 +60,10 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private errorMessage?: string;
 	private tui: TUI;
 	private scopedModels: ReadonlyArray<ScopedModelItem>;
-	private scope: ModelScope = "all";
-	private scopeText?: Text;
-	private scopeHintText?: Text;
+	private categories: ModelCategory[] = [CATEGORY_ALL];
+	private category: ModelCategory = CATEGORY_ALL;
+	private categoryText?: Text;
+	private categoryHintText?: Text;
 
 	constructor(
 		tui: TUI,
@@ -78,7 +82,9 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		this.settingsManager = settingsManager;
 		this.modelRegistry = modelRegistry;
 		this.scopedModels = scopedModels;
-		this.scope = scopedModels.length > 0 ? "scoped" : "all";
+		// Default to "scoped" category when scopedModels provided so users see their
+		// active model scope first (matches the prior scope-toggle behavior).
+		this.category = scopedModels.length > 0 ? CATEGORY_SCOPED : CATEGORY_ALL;
 		this.onSelectCallback = onSelect;
 		this.onCancelCallback = onCancel;
 
@@ -86,13 +92,12 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		this.addChild(new DynamicBorder());
 		this.addChild(new Spacer(1));
 
-		// Add hint about model filtering
-		if (scopedModels.length > 0) {
-			this.scopeText = new Text(this.getScopeText(), 0, 0);
-			this.addChild(this.scopeText);
-			this.scopeHintText = new Text(this.getScopeHintText(), 0, 0);
-			this.addChild(this.scopeHintText);
-		} else {
+		// Category tabs (always rendered — populated once models load)
+		this.categoryText = new Text("", 0, 0);
+		this.addChild(this.categoryText);
+		this.categoryHintText = new Text(this.getCategoryHintText(), 0, 0);
+		this.addChild(this.categoryHintText);
+		if (scopedModels.length === 0) {
 			const hintText = "Only showing models from configured providers. Use /login to add providers.";
 			this.addChild(new Text(theme.fg("warning", hintText), 0, 0));
 		}
@@ -173,11 +178,42 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			id: scoped.model.id,
 			model: scoped.model,
 		}));
-		this.activeModels = this.scope === "scoped" ? this.scopedModelItems : this.allModels;
+		this.categories = this.computeCategories();
+		// Snap to a valid category if our default isn't available (e.g. scoped requested but empty)
+		if (!this.categories.includes(this.category)) {
+			this.category = this.categories[0] ?? CATEGORY_ALL;
+		}
+		this.activeModels = this.modelsForCategory(this.category);
 		this.filteredModels = this.activeModels;
 		const currentIndex = this.filteredModels.findIndex((item) => modelsAreEqual(this.currentModel, item.model));
 		this.selectedIndex =
 			currentIndex >= 0 ? currentIndex : Math.min(this.selectedIndex, Math.max(0, this.filteredModels.length - 1));
+		if (this.categoryText) {
+			this.categoryText.setText(this.getCategoryText());
+		}
+	}
+
+	private computeCategories(): ModelCategory[] {
+		// When the user has a scope (enabledModels / --models), categories are derived
+		// from scoped providers — selecting an unscoped model bypasses gating extensions
+		// (like the tardis lane fence). "all" stays available as an escape hatch.
+		const hasScope = this.scopedModelItems.length > 0;
+		const sourceItems = hasScope ? this.scopedModelItems : this.allModels;
+		const providers = Array.from(new Set(sourceItems.map((m) => m.provider))).sort((a, b) => a.localeCompare(b));
+		const categories: ModelCategory[] = [];
+		if (hasScope) categories.push(CATEGORY_SCOPED);
+		categories.push(...providers);
+		categories.push(CATEGORY_ALL);
+		return categories;
+	}
+
+	private modelsForCategory(category: ModelCategory): ModelItem[] {
+		if (category === CATEGORY_ALL) return this.allModels;
+		if (category === CATEGORY_SCOPED) return this.scopedModelItems;
+		// Provider categories respect the scope when active so users only see models
+		// they've explicitly enabled (settings.enabledModels / --models).
+		const source = this.scopedModelItems.length > 0 ? this.scopedModelItems : this.allModels;
+		return source.filter((m) => m.provider === category);
 	}
 
 	private sortModels(models: ModelItem[]): ModelItem[] {
@@ -193,26 +229,43 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		return sorted;
 	}
 
-	private getScopeText(): string {
-		const allText = this.scope === "all" ? theme.fg("accent", "all") : theme.fg("muted", "all");
-		const scopedText = this.scope === "scoped" ? theme.fg("accent", "scoped") : theme.fg("muted", "scoped");
-		return `${theme.fg("muted", "Scope: ")}${allText}${theme.fg("muted", " | ")}${scopedText}`;
+	private categoryLabel(category: ModelCategory): string {
+		// Use the provider name verbatim — providers are short, kebab-case identifiers
+		// (e.g. "amazon-bedrock", "tardis"). "all"/"scoped" stay lowercase to match.
+		return category;
 	}
 
-	private getScopeHintText(): string {
-		return keyHint("tui.input.tab", "scope") + theme.fg("muted", " (all/scoped)");
+	private getCategoryText(): string {
+		if (this.categories.length === 0) return "";
+		const parts = this.categories.map((cat) => {
+			const label = this.categoryLabel(cat);
+			return cat === this.category ? theme.fg("accent", label) : theme.fg("muted", label);
+		});
+		const sep = theme.fg("muted", " | ");
+		return parts.join(sep);
 	}
 
-	private setScope(scope: ModelScope): void {
-		if (this.scope === scope) return;
-		this.scope = scope;
-		this.activeModels = this.scope === "scoped" ? this.scopedModelItems : this.allModels;
+	private getCategoryHintText(): string {
+		return keyHint("tui.input.tab", "category") + theme.fg("muted", " (cycle providers)");
+	}
+
+	private setCategory(category: ModelCategory): void {
+		if (this.category === category) return;
+		this.category = category;
+		this.activeModels = this.modelsForCategory(category);
 		const currentIndex = this.activeModels.findIndex((item) => modelsAreEqual(this.currentModel, item.model));
 		this.selectedIndex = currentIndex >= 0 ? currentIndex : 0;
 		this.filterModels(this.searchInput.getValue());
-		if (this.scopeText) {
-			this.scopeText.setText(this.getScopeText());
+		if (this.categoryText) {
+			this.categoryText.setText(this.getCategoryText());
 		}
+	}
+
+	private cycleCategory(direction: 1 | -1): void {
+		if (this.categories.length <= 1) return;
+		const currentIdx = this.categories.indexOf(this.category);
+		const nextIdx = (currentIdx + direction + this.categories.length) % this.categories.length;
+		this.setCategory(this.categories[nextIdx]!);
 	}
 
 	private filterModels(query: string): void {
@@ -287,13 +340,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	handleInput(keyData: string): void {
 		const kb = getKeybindings();
 		if (kb.matches(keyData, "tui.input.tab")) {
-			if (this.scopedModelItems.length > 0) {
-				const nextScope: ModelScope = this.scope === "all" ? "scoped" : "all";
-				this.setScope(nextScope);
-				if (this.scopeHintText) {
-					this.scopeHintText.setText(this.getScopeHintText());
-				}
-			}
+			this.cycleCategory(1);
 			return;
 		}
 		// Up arrow - wrap to bottom when at top
