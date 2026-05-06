@@ -23,6 +23,27 @@
 
 Tools for building AI agents.
 
+## Fork Extensions
+
+This fork adds 10 extensions in [`extensions/`](extensions/):
+
+| Extension | Purpose |
+|-----------|--------|
+| **[cortex](extensions/cortex)** | Memory system with 10-stage retrieval pipeline, entity graph, pattern mining |
+| **[stats](extensions/stats)** | Unified AI usage dashboard (pi + Claude Code) — `/stats`, web UI |
+| **[swarm](extensions/swarm)** | Multi-agent deliberation + YAML DAG orchestration |
+| **[web-access](extensions/web-access)** | Web search, fetch, YouTube, PDF, GitHub |
+| **[mcp-adapter](extensions/mcp-adapter)** | Token-efficient MCP server gateway |
+| **[markdown-preview](extensions/markdown-preview)** | Rendered markdown + LaTeX preview |
+| **[mitsupi](extensions/mitsupi)** | Personal utilities (loop, todos, review) |
+| **[pai](extensions/pai)** | PAI skill discovery + HUD statusline |
+| **[buddy](extensions/buddy)** | Virtual companion widget |
+| **[ultra](extensions/ultra)** | ULTRA keyword-triggered deep thinking modes |
+
+See [`extensions/README.md`](extensions/README.md) for full details, setup, and attribution.
+
+Fork-specific docs: [`ADDITIONS.md`](ADDITIONS.md) (patches), [`PLAN.md`](PLAN.md) (roadmap).
+
 ## Share your OSS coding agent sessions
 
 If you use pi or other coding agents for open source work, please share your sessions.
