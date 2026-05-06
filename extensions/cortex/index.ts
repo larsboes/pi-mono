@@ -18,12 +18,15 @@ import * as session from "./src/session.js";
 import * as skillTracker from "./src/skill-tracker.js";
 import * as selfExtension from "./src/self-extension.js";
 import * as extensionCreator from "./src/extension-creator.js";
+import { runCompaction } from "./src/compaction.js";
 
 /**
  * Cortex — Self-extending agent extension
  *
  * Phase 8: Retrieval quality — intent classification, entity graph,
  * hierarchical index, session context injection, and feedback loop.
+ * Phase 9: Temporal intelligence, query expansion, multi-hop retrieval,
+ * and weekly compaction.
  * See PRD.md for the full build plan.
  */
 export default function cortex(pi: ExtensionAPI) {
@@ -53,6 +56,16 @@ export default function cortex(pi: ExtensionAPI) {
 
 		// Initialize session tracking
 		await session.initSession();
+
+		// Phase 9.5: Weekly compaction (runs max once per day)
+		try {
+			const compaction = await runCompaction();
+			if (compaction.weeksCompacted > 0) {
+				console.log(`[cortex] Compacted ${compaction.weeksCompacted} week(s): ${compaction.newFiles.join(", ")}`);
+			}
+		} catch (e) {
+			console.error(`[cortex] Weekly compaction failed (non-fatal): ${(e as Error).message}`);
+		}
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
@@ -953,5 +966,5 @@ export default function cortex(pi: ExtensionAPI) {
 		},
 	});
 
-	console.log("[cortex] Extension loaded — Phase 8 (intent classification + entity graph + hierarchical index + session context + feedback loop)");
+	console.log("[cortex] Extension loaded — Phase 9 (temporal routing + query expansion + multi-hop + weekly compaction)");
 }

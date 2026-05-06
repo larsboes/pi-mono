@@ -9,6 +9,9 @@ import { rerank as rerankResults, isRerankerAvailable } from "./rerank.js";
 import { classifyIntentFull, getIntentWeights, getWeightForSource, type QueryIntent, type IntentResult } from "./intent.js";
 import { getRelatedEntities, updateGraph } from "./graph.js";
 import { logInteraction, computePersonalWeights, applyPersonalWeights } from "./feedback.js";
+import { detectTemporalRange, isInRange, hasStrongTemporalIntent } from "./temporal.js";
+import { expandQuery } from "./query-expansion.js";
+import { multiHopSearch, shouldUseMultiHop } from "./multihop.js";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 
@@ -199,9 +202,14 @@ export interface SearchOptions {
 }
 
 /**
- * Search memory: full Phase 8 pipeline.
+ * Search memory: Phase 8 + Phase 9 pipeline.
  *
- * Pipeline stages (in order):
+ * Phase 9 additions (pre-pipeline):
+ * 0a. Temporal routing — detect date references, boost matching daily logs (9.2)
+ * 0b. Query expansion — enrich with session context + graph entities (9.1)
+ * 0c. Multi-hop — iterative entity chase for relational queries (9.3)
+ *
+ * Phase 8 pipeline stages:
  * 1. Retrieve candidates (bi-encoder vector or keyword fallback)
  * 2. Intent classification + auto-granularity routing (8.2 + 8.4)
  * 3. Granularity filter (8.4)
@@ -218,6 +226,53 @@ export async function search(
 ): Promise<MemoryResult[]> {
 	await init();
 
+	// ── Phase 9.3: Multi-hop for relational queries ─────────────────
+	if (shouldUseMultiHop(query) && !options?.intent) {
+		try {
+			const hopResults = await multiHopSearch(
+				(q, max, opts) => searchCore(q, max, opts),
+				query,
+				maxResults,
+				options,
+			);
+			if (hopResults.length > 0) {
+				return hopResults;
+			}
+		} catch (e) {
+			console.error(`[cortex/memory] Multi-hop failed, falling back: ${(e as Error).message}`);
+		}
+	}
+
+	return searchCore(query, maxResults, options);
+}
+
+/**
+ * Core search pipeline (Phase 8 stages + Phase 9 temporal/expansion).
+ * Separated from search() to allow multi-hop to call it recursively.
+ */
+async function searchCore(
+	query: string,
+	maxResults = 5,
+	options?: SearchOptions,
+): Promise<MemoryResult[]> {
+	await init();
+
+	// ── Stage 0a: Temporal routing (9.2) ────────────────────────
+	const temporalRange = detectTemporalRange(query);
+	const isStrongTemporal = temporalRange && hasStrongTemporalIntent(query);
+
+	// ── Stage 0b: Query expansion (9.1) ─────────────────────────
+	let effectiveQuery = query;
+	try {
+		const expanded = await expandQuery(query, 6);
+		if (expanded.expansionTerms.length > 0) {
+			// Use expanded terms for keyword search enrichment
+			effectiveQuery = `${query} ${expanded.expansionTerms.join(" ")}`;
+		}
+	} catch {
+		// Expansion is best-effort
+	}
+
 	// ── Stage 1: Retrieve candidates ────────────────────────────────
 	let candidates: MemoryResult[] = [];
 	try {
@@ -230,10 +285,23 @@ export async function search(
 	}
 
 	if (candidates.length === 0) {
-		candidates = await keywordSearch(query, maxResults * 4);
+		candidates = await keywordSearch(effectiveQuery, maxResults * 4);
 	}
 
 	if (candidates.length === 0) return [];
+
+	// ── Stage 1b: Temporal boost (9.2) ────────────────────────
+	if (temporalRange) {
+		candidates = candidates.map((r) => {
+			if (isInRange(r.source, temporalRange)) {
+				// Strong temporal intent: major boost to matching dates
+				const boost = isStrongTemporal ? 0.4 : 0.15;
+				return { ...r, score: Math.min(1.0, r.score + boost) };
+			}
+			return r;
+		});
+		candidates.sort((a, b) => b.score - a.score);
+	}
 
 	// ── Stage 2: Intent classification (8.2) ─────────────────────────
 	const intentResult: IntentResult = classifyIntentFull(query);
