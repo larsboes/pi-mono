@@ -2535,6 +2535,11 @@ export class InteractiveMode {
 				await this.handleCompactCommand(customInstructions);
 				return;
 			}
+			if (text === "/retry") {
+				this.editor.setText("");
+				await this.handleRetryCommand();
+				return;
+			}
 			if (text === "/reload") {
 				this.editor.setText("");
 				await this.handleReloadCommand();
@@ -5446,6 +5451,36 @@ export class InteractiveMode {
 
 		this.bashComponent = undefined;
 		this.ui.requestRender();
+	}
+
+	private async handleRetryCommand(): Promise<void> {
+		if (this.session.isStreaming) {
+			this.showWarning("Cannot retry while streaming");
+			return;
+		}
+
+		const userMessages = this.session.getUserMessagesForForking();
+		if (userMessages.length === 0) {
+			this.showWarning("No messages to retry");
+			return;
+		}
+
+		const lastUserMsg = userMessages[userMessages.length - 1];
+		try {
+			// Navigate tree to the last user message entry (sets leaf to its parent, returns text)
+			const result = await this.session.navigateTree(lastUserMsg.entryId);
+			if (result.cancelled) return;
+
+			this.renderCurrentSessionState();
+
+			// Re-submit the same prompt
+			const text = result.editorText ?? lastUserMsg.text;
+			if (text) {
+				await this.session.prompt(text);
+			}
+		} catch (error: unknown) {
+			this.showError(error instanceof Error ? error.message : String(error));
+		}
 	}
 
 	private async handleCompactCommand(customInstructions?: string): Promise<void> {

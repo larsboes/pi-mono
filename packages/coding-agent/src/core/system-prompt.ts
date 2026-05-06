@@ -4,6 +4,7 @@
 
 import { getDocsPath, getExamplesPath, getReadmePath } from "../config.js";
 import { formatSkillsForPrompt, type Skill } from "./skills.js";
+import { buildWorkspaceTree } from "./workspace-tree.js";
 
 export interface BuildSystemPromptOptions {
 	/** Custom system prompt (replaces default). */
@@ -75,6 +76,12 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		// Add date and working directory last
 		prompt += `\nCurrent date: ${date}`;
 		prompt += `\nCurrent working directory: ${promptCwd}`;
+
+		// Inject workspace tree
+		const workspaceTree = buildWorkspaceTree(resolvedCwd);
+		if (workspaceTree) {
+			prompt += `\n\n<workspace-tree>\n${workspaceTree}\n</workspace-tree>`;
+		}
 
 		return prompt;
 	}
@@ -167,6 +174,12 @@ Pi documentation (read only when the user asks about pi itself, its SDK, extensi
 	// Add date and working directory last
 	prompt += `\nCurrent date: ${date}`;
 	prompt += `\nCurrent working directory: ${promptCwd}`;
+
+	// Inject workspace tree so the agent knows project structure without `ls`
+	const workspaceTree = buildWorkspaceTree(resolvedCwd);
+	if (workspaceTree) {
+		prompt += `\n\n<workspace-tree>\n${workspaceTree}\n</workspace-tree>`;
+	}
 
 	return prompt;
 }
