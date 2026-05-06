@@ -19,6 +19,8 @@ import * as skillTracker from "./src/skill-tracker.js";
 import * as selfExtension from "./src/self-extension.js";
 import * as extensionCreator from "./src/extension-creator.js";
 import { runCompaction } from "./src/compaction.js";
+import { runGraphMaintenance } from "./src/graph-maintenance.js";
+import { applyTokenBudget, type ContextSection } from "./src/token-budget.js";
 
 /**
  * Cortex — Self-extending agent extension
@@ -27,7 +29,8 @@ import { runCompaction } from "./src/compaction.js";
  * hierarchical index, session context injection, and feedback loop.
  * Phase 9: Temporal intelligence, query expansion, multi-hop retrieval,
  * and weekly compaction.
- * See PRD.md for the full build plan.
+ * Phase 10: Intelligence layer — sub-sequence pattern mining, token-budgeted
+ * context injection, and graph maintenance (decay + pruning).
  */
 export default function cortex(pi: ExtensionAPI) {
 	// Capture reload function from command context (available in commands but not tools)
@@ -65,6 +68,16 @@ export default function cortex(pi: ExtensionAPI) {
 			}
 		} catch (e) {
 			console.error(`[cortex] Weekly compaction failed (non-fatal): ${(e as Error).message}`);
+		}
+
+		// Phase 10.4: Graph maintenance (temporal decay + pruning, max once per day)
+		try {
+			const gm = await runGraphMaintenance();
+			if (gm.ran) {
+				console.log(`[cortex] Graph maintenance: ${gm.edgesPruned} edges pruned, ${gm.nodesPruned} nodes pruned, ${gm.decayApplied} decayed`);
+			}
+		} catch (e) {
+			console.error(`[cortex] Graph maintenance failed (non-fatal): ${(e as Error).message}`);
 		}
 	});
 
@@ -966,5 +979,5 @@ export default function cortex(pi: ExtensionAPI) {
 		},
 	});
 
-	console.log("[cortex] Extension loaded — Phase 9 (temporal routing + query expansion + multi-hop + weekly compaction)");
+	console.log("[cortex] Extension loaded — Phase 10 (sub-sequence mining + token budget + graph maintenance)");
 }

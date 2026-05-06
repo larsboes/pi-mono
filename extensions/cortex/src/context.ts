@@ -15,6 +15,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import * as scratchpad from "./scratchpad.js";
+import { applyTokenBudget, type ContextSection } from "./token-budget.js";
 
 const MEMORY_DIR = join(homedir(), ".pi", "memory");
 const TELOS_DIR = join(MEMORY_DIR, "TELOS");
@@ -107,39 +108,52 @@ export async function loadHotContext(): Promise<HotContext> {
 }
 
 export function formatHotContext(ctx: HotContext): string | null {
-	const parts: string[] = [];
+	// Phase 10.2: Build sections with priorities and apply token budget
+	const sections: ContextSection[] = [];
 
-	if (ctx.identity) {
-		parts.push(`## Identity\n${ctx.identity}`);
-	}
-	if (ctx.soul) {
-		parts.push(`## Soul\n${ctx.soul}`);
-	}
-	if (ctx.user) {
-		parts.push(`## User Profile\n${ctx.user}`);
-	}
-	if (ctx.memory) {
-		parts.push(`## Long-term Memory\n${ctx.memory}`);
-	}
-	if (ctx.telos) {
-		parts.push(`## Life Context (TELOS)\n${ctx.telos}`);
-	}
+	// Mandatory: always include (small, high-signal)
 	if (ctx.scratchpadOpen.length > 0) {
-		parts.push(`## Open Scratchpad Items\n${ctx.scratchpadOpen.join("\n")}`);
-	}
-	if (ctx.yesterdayLog) {
-		parts.push(`## Yesterday's Log\n${ctx.yesterdayLog}`);
+		sections.push({ id: "scratchpad", content: `## Open Scratchpad Items\n${ctx.scratchpadOpen.join("\n")}`, basePriority: 10, mandatory: true });
 	}
 	if (ctx.todayLog) {
-		parts.push(`## Today's Log\n${ctx.todayLog}`);
-	}
-	if (ctx.paiRelationshipYesterday || ctx.paiRelationshipToday) {
-		const notes = [ctx.paiRelationshipYesterday, ctx.paiRelationshipToday].filter(Boolean).join("\n\n---\n\n");
-		parts.push(`## CC Session Notes (from Claude Code)\n${notes}`);
+		sections.push({ id: "today", content: `## Today's Log\n${ctx.todayLog}`, basePriority: 9, mandatory: true });
 	}
 
-	if (parts.length === 0) return null;
+	// High priority: usually included
+	if (ctx.memory) {
+		sections.push({ id: "memory", content: `## Long-term Memory\n${ctx.memory}`, basePriority: 8 });
+	}
+	if (ctx.yesterdayLog) {
+		sections.push({ id: "yesterday", content: `## Yesterday's Log\n${ctx.yesterdayLog}`, basePriority: 7 });
+	}
 
+	// Medium priority: included if budget allows
+	if (ctx.telos) {
+		sections.push({ id: "telos", content: `## Life Context (TELOS)\n${ctx.telos}`, basePriority: 5 });
+	}
+	if (ctx.paiRelationshipToday || ctx.paiRelationshipYesterday) {
+		const notes = [ctx.paiRelationshipToday, ctx.paiRelationshipYesterday].filter(Boolean).join("\n\n---\n\n");
+		sections.push({ id: "pai-notes", content: `## CC Session Notes\n${notes}`, basePriority: 4 });
+	}
+
+	// Lower priority: only if small or budget has room
+	if (ctx.identity) {
+		sections.push({ id: "identity", content: `## Identity\n${ctx.identity}`, basePriority: 3 });
+	}
+	if (ctx.soul) {
+		sections.push({ id: "soul", content: `## Soul\n${ctx.soul}`, basePriority: 2 });
+	}
+	if (ctx.user) {
+		sections.push({ id: "user", content: `## User Profile\n${ctx.user}`, basePriority: 2 });
+	}
+
+	if (sections.length === 0) return null;
+
+	// Apply token budget — keeps mandatory + highest-priority that fits
+	const included = applyTokenBudget(sections);
+	if (included.length === 0) return null;
+
+	const parts = included.map((s) => s.content);
 	return `\n\n# Memory Context (auto-loaded)\n\n${parts.join("\n\n")}`;
 }
 

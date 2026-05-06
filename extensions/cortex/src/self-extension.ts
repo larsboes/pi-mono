@@ -12,6 +12,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import * as patterns from "./patterns.js";
+import * as subsequences from "./subsequences.js";
 import * as skillTracker from "./skill-tracker.js";
 
 const HOME = homedir();
@@ -43,18 +44,18 @@ export interface SelfExtensionStatus {
  * Returns null if there's nothing interesting to surface.
  */
 export async function buildStatus(): Promise<SelfExtensionStatus> {
-	const [patternStats, candidates, skillHealth, tracker] = await Promise.all([
+	const [patternStats, subseqCandidates, skillHealth, tracker] = await Promise.all([
 		patterns.getStats(),
-		patterns.getCrystallizationCandidates(3),
+		subsequences.getCrystallizationCandidates(20),
 		getSkillHealth(),
 		skillTracker.getUsageStats(),
 	]);
 
 	return {
-		crystallizationCandidates: candidates.map(c => ({
+		crystallizationCandidates: subseqCandidates.slice(0, 10).map(c => ({
 			signature: c.signature,
-			count: c.count,
-			example: c.examplePrompt.slice(0, 80),
+			count: c.totalCount,
+			example: c.examples[0]?.slice(0, 80) ?? "",
 		})),
 		topPatterns: patternStats.topPatterns.slice(0, 3),
 		staleSkills: skillHealth.stale,
