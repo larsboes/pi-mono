@@ -1,3 +1,15 @@
+/**
+ * Phase 8.5: Session Context — Activity tracking + context injection
+ *
+ * Tracks current session activities, provides context entities for
+ * retrieval boost, and generates session summaries for daily logs.
+ *
+ * Phase 8.5 enhancements:
+ * - Recency-weighted context entities (recent files > old files)
+ * - Tool call names included as context
+ * - Dynamic boost magnitude based on activity density
+ */
+
 import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -24,6 +36,7 @@ interface SessionState {
   lastActivity: string;
   filesTouched: string[];
   skillsUsed: string[];
+  toolsUsed: string[];
   processedMessages: number;
 }
 
@@ -51,7 +64,12 @@ async function loadState(): Promise<SessionState | null> {
   try {
     const raw = await readFile(SESSION_STATE_FILE, "utf-8");
     const parsed = JSON.parse(raw) as unknown;
-    return isValidState(parsed) ? parsed : null;
+    if (!isValidState(parsed)) return null;
+    // Ensure toolsUsed exists (backward compat)
+    if (!Array.isArray(parsed.toolsUsed)) {
+      (parsed as SessionState).toolsUsed = [];
+    }
+    return parsed as SessionState;
   } catch {
     return null;
   }
@@ -80,6 +98,7 @@ export async function initSession(): Promise<SessionState> {
     lastActivity: new Date().toISOString(),
     filesTouched: [],
     skillsUsed: [],
+    toolsUsed: [],
     processedMessages: 0,
   };
 
@@ -109,7 +128,6 @@ export async function recordActivity(
 
   // Track files touched
   if (type === "read" || type === "edit" || type === "write") {
-    // `detail` is the raw path; don't split on spaces (paths may contain spaces).
     const file = detail.trim();
     if (file && !currentSession!.filesTouched.includes(file)) {
       currentSession!.filesTouched.push(file);
@@ -120,6 +138,13 @@ export async function recordActivity(
   if (type === "skill") {
     if (!currentSession!.skillsUsed.includes(detail)) {
       currentSession!.skillsUsed.push(detail);
+    }
+  }
+
+  // Track tools used
+  if (type === "tool" || type === "crystallize") {
+    if (!currentSession!.toolsUsed.includes(detail)) {
+      currentSession!.toolsUsed.push(detail);
     }
   }
 
@@ -213,7 +238,7 @@ function generateSummary(state: SessionState): string {
 
   // Files touched (max 5)
   if (state.filesTouched.length > 0) {
-    const files = state.filesTouched.slice(0, 5).map(f => f.split("/").pop() || f);
+    const files = state.filesTouched.slice(-5).map(f => f.split("/").pop() || f);
     lines.push(`Files: ${files.join(", ")}${state.filesTouched.length > 5 ? "..." : ""}`);
   }
 
@@ -249,6 +274,7 @@ export async function flushSession(): Promise<string | null> {
   const activityText = [
     ...currentSession.filesTouched,
     ...currentSession.skillsUsed,
+    ...currentSession.toolsUsed,
     ...currentSession.activities.map((a) => a.detail),
   ].join(" ");
   updateGraph(activityText, sessionId).catch(() => {});
@@ -262,25 +288,64 @@ export async function flushSession(): Promise<string | null> {
   return summary;
 }
 
-/**
- * Get current session context for use in retrieval boost (Phase 8.5).
- */
+// ── Phase 8.5: Session Context for Retrieval Boost ─────────────────────────
+
 export interface SessionContext {
+  /** File basenames touched this session, ordered by recency (most recent first) */
   files: string[];
+  /** Skills loaded this session */
   skills: string[];
+  /** Tools used this session */
   tools: string[];
+  /** Activity density: activities per minute (higher = more active session) */
+  density: number;
 }
 
+/**
+ * Get current session context for retrieval boost.
+ *
+ * Phase 8.5: Returns recency-ordered entities with activity density
+ * for dynamic boost magnitude calculation.
+ */
 export function getSessionContext(): SessionContext {
-  if (!currentSession) return { files: [], skills: [], tools: [] };
-  const tools = currentSession.activities
-    .filter((a) => a.type === "tool" || a.type === "crystallize")
-    .map((a) => a.detail);
+  if (!currentSession) return { files: [], skills: [], tools: [], density: 0 };
+
+  // Recency-ordered files: most recently touched first
+  const recentFiles = [...currentSession.filesTouched]
+    .reverse()
+    .slice(0, 10)
+    .map((f) => f.split("/").pop() ?? f);
+
+  // Unique tools used
+  const tools = [...new Set(currentSession.toolsUsed)];
+
+  // Activity density: activities per minute
+  const start = new Date(currentSession.startTime).getTime();
+  const elapsed = Math.max(1, (Date.now() - start) / 60000); // minutes, min 1
+  const density = currentSession.activities.length / elapsed;
+
   return {
-    files: currentSession.filesTouched.map((f) => f.split("/").pop() ?? f),
+    files: recentFiles,
     skills: currentSession.skillsUsed,
-    tools: [...new Set(tools)],
+    tools,
+    density,
   };
+}
+
+/**
+ * Get all context entities for memory retrieval boost.
+ * Combines files, skills, and tools into a single list ordered by relevance.
+ *
+ * Phase 8.5: Recency-weighted — recent files get priority, tools and skills
+ * are included because they indicate the working domain.
+ */
+export function getContextEntities(): string[] {
+  const ctx = getSessionContext();
+  // Priority order: recent files > skills > tools
+  // Files are already recency-ordered
+  const entities = [...ctx.files, ...ctx.skills, ...ctx.tools];
+  // Deduplicate preserving order
+  return [...new Set(entities)].slice(0, 20);
 }
 
 /**
@@ -290,7 +355,9 @@ export async function getStats(): Promise<{
   activityCount: number;
   filesTouched: number;
   skillsUsed: number;
+  toolsUsed: number;
   duration: number;
+  density: number;
 } | null> {
   if (!currentSession) {
     const state = await loadState();
@@ -301,11 +368,14 @@ export async function getStats(): Promise<{
   const start = new Date(currentSession.startTime);
   const now = new Date();
   const duration = Math.round((now.getTime() - start.getTime()) / 60000);
+  const density = duration > 0 ? currentSession.activities.length / duration : 0;
 
   return {
     activityCount: currentSession.activities.length,
     filesTouched: currentSession.filesTouched.length,
     skillsUsed: currentSession.skillsUsed.length,
+    toolsUsed: currentSession.toolsUsed?.length ?? 0,
     duration,
+    density,
   };
 }

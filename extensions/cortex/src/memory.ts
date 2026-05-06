@@ -6,8 +6,8 @@ import { LocalIndex } from "vectra";
 import { glob } from "glob";
 import { pipeline, type FeatureExtractionPipeline } from "@xenova/transformers";
 import { rerank as rerankResults, isRerankerAvailable } from "./rerank.js";
-import { classifyIntent, getIntentWeights, categorizeSource, type QueryIntent } from "./intent.js";
-import { extractEntities, traverseGraph, updateGraph } from "./graph.js";
+import { classifyIntentFull, getIntentWeights, getWeightForSource, type QueryIntent, type IntentResult } from "./intent.js";
+import { getRelatedEntities, updateGraph } from "./graph.js";
 import { logInteraction, computePersonalWeights, applyPersonalWeights } from "./feedback.js";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
@@ -24,7 +24,6 @@ const MODEL_CACHE_DIR = join(HOME, ".cache", "pi-cortex", "models");
 const PAI_MEMORY_DIR = join(HOME, ".pai", "MEMORY");
 const PAI_DAILY_DIR = join(PAI_MEMORY_DIR, "DAILY");
 
-const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
 const LOCAL_EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -38,6 +37,8 @@ export interface MemoryResult {
 	rerankScore?: number;
 	/** Phase 8.4: granularity level of this chunk */
 	granularity?: "document" | "section" | "chunk";
+	/** Phase 8.2: intent that was used for scoring */
+	intent?: QueryIntent;
 }
 
 interface ItemMetadata {
@@ -45,16 +46,15 @@ interface ItemMetadata {
 	type: string;
 	text: string;
 	timestamp: string;
-	// granularity and parentId are written as Phase 8.4 extras; omitted = old chunk
-	[key: string]: string | number | boolean;
+	granularity?: string;
+	intent?: string;
+	[key: string]: string | number | boolean | undefined;
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-let geminiKey: string | null = null;
 let embeddingPipeline: FeatureExtractionPipeline | null = null;
 let embeddingLoadPromise: Promise<FeatureExtractionPipeline> | null = null;
-let usingLocalEmbeddings = false;
 let index: LocalIndex | null = null;
 let initialized = false;
 
@@ -63,7 +63,7 @@ let initialized = false;
 export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 	if (initialized) {
 		return {
-			hasKey: !!geminiKey || usingLocalEmbeddings,
+			hasKey: true,
 			hasIndex: index ? await index.isIndexCreated() : false,
 		};
 	}
@@ -73,61 +73,19 @@ export async function init(): Promise<{ hasKey: boolean; hasIndex: boolean }> {
 		if (!existsSync(dir)) await mkdir(dir, { recursive: true });
 	}
 
-	// Always use local embeddings — no external API calls
-	usingLocalEmbeddings = true;
 	console.log(`[cortex/memory] Using local embeddings (${LOCAL_EMBEDDING_MODEL})`);
 
 	// Init vector index
 	index = new LocalIndex(INDEX_DIR);
-
 	initialized = true;
 
 	return {
-		hasKey: !!geminiKey || usingLocalEmbeddings,
+		hasKey: true,
 		hasIndex: await index.isIndexCreated(),
 	};
 }
 
-function loadGeminiKey(): string | null {
-	// Prefer .env file over process.env (shell env may have stale keys)
-	try {
-		const content = require("node:fs").readFileSync(ENV_FILE, "utf-8");
-		for (const line of content.split("\n")) {
-			const trimmed = line.trim();
-			if (trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-			const [key, ...rest] = trimmed.split("=");
-			if (key.trim() === "GEMINI_API_KEY") return rest.join("=").trim();
-		}
-	} catch {
-		// No .env file
-	}
-
-	if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-	return null;
-}
-
 // ── Embeddings ─────────────────────────────────────────────────────────────
-
-async function getGeminiEmbedding(text: string): Promise<number[] | null> {
-	if (!geminiKey) return null;
-
-	const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${geminiKey}`;
-
-	const res = await fetch(url, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ content: { parts: [{ text }] } }),
-	});
-
-	if (!res.ok) {
-		const err = await res.text();
-		throw new Error(`Embedding API ${res.status}: ${err}`);
-	}
-
-	const data = (await res.json()) as { embedding?: { values?: number[] } };
-	if (data.embedding?.values) return data.embedding.values;
-	throw new Error("Invalid embedding response");
-}
 
 async function loadLocalEmbeddingModel(): Promise<FeatureExtractionPipeline> {
 	if (embeddingPipeline) return embeddingPipeline;
@@ -158,20 +116,16 @@ async function loadLocalEmbeddingModel(): Promise<FeatureExtractionPipeline> {
 	}
 }
 
-async function getLocalEmbedding(text: string): Promise<number[] | null> {
+async function getEmbedding(text: string): Promise<number[] | null> {
 	try {
 		const pipe = await loadLocalEmbeddingModel();
 		const truncated = text.slice(0, 512);
 		const result = await pipe(truncated, { pooling: "mean", normalize: true });
 		return Array.from(result.data as Float32Array);
 	} catch (e) {
-		console.error(`[cortex/memory] Local embedding failed: ${(e as Error).message}`);
+		console.error(`[cortex/memory] Embedding failed: ${(e as Error).message}`);
 		return null;
 	}
-}
-
-async function getEmbedding(text: string): Promise<number[] | null> {
-	return getLocalEmbedding(text);
 }
 
 // ── Keyword Search (BM25-lite fallback) ────────────────────────────────────
@@ -237,27 +191,37 @@ async function vectorSearch(query: string, maxResults: number): Promise<MemoryRe
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+export interface SearchOptions {
+	rerank?: boolean;
+	intent?: QueryIntent;
+	granularity?: "document" | "section" | "chunk";
+	contextEntities?: string[];
+}
+
 /**
- * Search memory: vector first, keyword fallback.
- * Integrates intent weighting (8.2), graph expansion (8.3), granularity filter (8.4),
- * session context boost (8.5), feedback personalization (8.6), and cross-encoder reranking (8.1).
+ * Search memory: full Phase 8 pipeline.
+ *
+ * Pipeline stages (in order):
+ * 1. Retrieve candidates (bi-encoder vector or keyword fallback)
+ * 2. Intent classification + auto-granularity routing (8.2 + 8.4)
+ * 3. Granularity filter (8.4)
+ * 4. Intent-weighted scoring (8.2)
+ * 5. Entity graph expansion boost (8.3)
+ * 6. Session context boost (8.5)
+ * 7. Personal weight adjustment (8.6)
+ * 8. Cross-encoder reranking (8.1)
  */
 export async function search(
 	query: string,
 	maxResults = 5,
-	options?: {
-		rerank?: boolean;
-		intent?: QueryIntent;
-		granularity?: "document" | "section" | "chunk";
-		contextEntities?: string[];
-	},
+	options?: SearchOptions,
 ): Promise<MemoryResult[]> {
 	await init();
 
-	// Stage 1: Retrieve candidates (bi-encoder or keyword)
+	// ── Stage 1: Retrieve candidates ────────────────────────────────
 	let candidates: MemoryResult[] = [];
 	try {
-		const vectorResults = await vectorSearch(query, maxResults * 3);
+		const vectorResults = await vectorSearch(query, maxResults * 4);
 		if (vectorResults && vectorResults.length > 0) {
 			candidates = vectorResults;
 		}
@@ -266,42 +230,53 @@ export async function search(
 	}
 
 	if (candidates.length === 0) {
-		candidates = await keywordSearch(query, maxResults * 3);
+		candidates = await keywordSearch(query, maxResults * 4);
 	}
 
-	// Phase 8.4: Granularity filter
-	if (options?.granularity) {
-		const filtered = candidates.filter((r) => !r.granularity || r.granularity === options.granularity);
-		if (filtered.length > 0) candidates = filtered;
+	if (candidates.length === 0) return [];
+
+	// ── Stage 2: Intent classification (8.2) ─────────────────────────
+	const intentResult: IntentResult = classifyIntentFull(query);
+	const activeIntent = options?.intent ?? intentResult.intent;
+	const intentWeights = getIntentWeights(activeIntent);
+
+	// ── Stage 3: Granularity filter (8.4) ────────────────────────────
+	// Use explicit granularity if provided, else auto-route from intent
+	const granularityFilter = options?.granularity ?? intentResult.suggestedGranularity;
+	if (granularityFilter) {
+		const filtered = candidates.filter((r) => {
+			// Keep items without granularity metadata (old index entries)
+			if (!r.granularity) return true;
+			return r.granularity === granularityFilter;
+		});
+		// Only apply filter if it doesn't eliminate everything
+		if (filtered.length >= Math.min(3, candidates.length * 0.3)) {
+			candidates = filtered;
+		}
 	}
 
-	// Phase 8.2: Intent-based score weighting
-	const intent = options?.intent ?? classifyIntent(query);
-	if (intent !== "general") {
-		const weights = getIntentWeights(intent);
+	// ── Stage 4: Intent-weighted scoring (8.2) ───────────────────────
+	if (activeIntent !== "general") {
 		candidates = candidates.map((r) => {
-			const cat = categorizeSource(r.source);
-			let multiplier = 1.0;
-			if (cat === "daily") multiplier = weights.recencyBias;
-			else if (cat === "skill") multiplier = weights.skillBoost;
-			else if (cat === "error") multiplier = weights.errorBoost;
-			else if (cat === "path") multiplier = weights.pathBoost;
-			return { ...r, score: Math.min(1.0, r.score * multiplier) };
+			const multiplier = getWeightForSource(r.source, intentWeights);
+			return { ...r, score: Math.min(1.0, r.score * multiplier), intent: activeIntent };
 		});
 		candidates.sort((a, b) => b.score - a.score);
 	}
 
-	// Phase 8.3: Graph entity expansion — boost results sharing entities with query
+	// ── Stage 5: Entity graph expansion boost (8.3) ──────────────────
 	try {
-		const queryEntities = extractEntities(query);
-		const neighborSets = await Promise.all(queryEntities.slice(0, 5).map((e) => traverseGraph(e, 2)));
-		const graphNeighbors = neighborSets.flat();
-		const allEntities = [...queryEntities, ...graphNeighbors];
-		if (allEntities.length > 0) {
+		const relatedEntities = await getRelatedEntities(query, 15);
+		if (relatedEntities.length > 0) {
 			candidates = candidates.map((r) => {
 				const lowerText = (r.source + " " + r.text).toLowerCase();
-				const hasEntity = allEntities.some((e) => lowerText.includes(e.toLowerCase()));
-				return hasEntity ? { ...r, score: Math.min(1.0, r.score + 0.1) } : r;
+				const matchCount = relatedEntities.filter((e) =>
+					lowerText.includes(e.toLowerCase())
+				).length;
+				if (matchCount === 0) return r;
+				// Graduated boost: more entity matches = bigger boost (diminishing returns)
+				const boost = Math.min(0.2, matchCount * 0.05);
+				return { ...r, score: Math.min(1.0, r.score + boost) };
 			});
 			candidates.sort((a, b) => b.score - a.score);
 		}
@@ -309,63 +284,72 @@ export async function search(
 		// graph expansion is best-effort
 	}
 
-	// Phase 8.5: Session context boost
+	// ── Stage 6: Session context boost (8.5) ─────────────────────────
 	if (options?.contextEntities && options.contextEntities.length > 0) {
 		candidates = candidates.map((r) => {
 			const lowerText = (r.source + " " + r.text).toLowerCase();
-			const hasContext = options.contextEntities!.some((e) => lowerText.includes(e.toLowerCase()));
-			return hasContext ? { ...r, score: Math.min(1.0, r.score + 0.15) } : r;
+			const matchCount = options.contextEntities!.filter((e) =>
+				lowerText.includes(e.toLowerCase())
+			).length;
+			if (matchCount === 0) return r;
+			// Boost scales with how many session entities match, but caps at 0.2
+			const boost = Math.min(0.2, matchCount * 0.07);
+			return { ...r, score: Math.min(1.0, r.score + boost) };
 		});
 		candidates.sort((a, b) => b.score - a.score);
 	}
 
-	// Phase 8.6: Personal weight adjustment
+	// ── Stage 7: Personal weight adjustment (8.6) ────────────────────
 	try {
 		const weights = await computePersonalWeights();
 		if (Object.keys(weights).length > 0) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const adjusted = applyPersonalWeights(candidates as any, weights);
-			candidates = adjusted.map((r) => ({ ...r } as unknown as MemoryResult));
+			const adjusted = applyPersonalWeights(
+				candidates.map(c => ({ source: c.source, score: c.score })),
+				weights,
+			);
+			// Apply adjusted scores back
+			for (let i = 0; i < candidates.length; i++) {
+				if (adjusted[i]) candidates[i].score = adjusted[i].score;
+			}
 			candidates.sort((a, b) => b.score - a.score);
 		}
 	} catch {
 		// personalization is best-effort
 	}
 
-	// Phase 8.1: Rerank with cross-encoder if requested
+	// ── Stage 8: Cross-encoder reranking (8.1) ───────────────────────
 	if (options?.rerank && candidates.length > 0) {
 		const canRerank = await isRerankerAvailable();
 		if (canRerank) {
 			try {
-				const { rerank } = await import("./rerank.js");
-				const reranked = await rerank(query, candidates, maxResults);
-				const finalResults = reranked.map((r) => ({
+				const reranked = await rerankResults(query, candidates, maxResults);
+				const finalResults: MemoryResult[] = reranked.map((r) => ({
 					source: r.source,
 					text: r.text,
 					score: r.score,
 					method: r.method,
 					rerankScore: r.rerankScore,
 					granularity: candidates.find((c) => c.source === r.source && c.text === r.text)?.granularity,
+					intent: activeIntent,
 				}));
-				// Phase 8.6: Log interaction
-				logInteraction(query, finalResults.map((r) => r.source)).catch(() => {});
+				// Log interaction for feedback loop
+				logInteraction(query, finalResults.map((r) => r.source), "search", activeIntent).catch(() => {});
 				return finalResults;
 			} catch (e) {
-				console.error(`[cortex/memory] Reranking failed: ${(e as Error).message}, returning original results`);
+				console.error(`[cortex/memory] Reranking failed: ${(e as Error).message}`);
 			}
-		} else {
-			console.log("[cortex/memory] Reranker not available, using original scores");
 		}
 	}
 
 	const finalResults = candidates.slice(0, maxResults);
-	// Phase 8.6: Log interaction
-	logInteraction(query, finalResults.map((r) => r.source)).catch(() => {});
+	// Log interaction for feedback loop
+	logInteraction(query, finalResults.map((r) => r.source), "search", activeIntent).catch(() => {});
 	return finalResults;
 }
 
 /**
  * Store text in memory. Optionally add to daily log.
+ * Phase 8.3: Also updates entity graph with extracted entities.
  */
 export async function store(text: string, daily = false): Promise<string> {
 	await init();
@@ -386,6 +370,7 @@ export async function store(text: string, daily = false): Promise<string> {
 			type: "daily",
 			text,
 			timestamp: new Date().toISOString(),
+			granularity: "chunk",
 		});
 
 		// Dual-write to shared PAI store so CC LoadContext can read pi session summaries
@@ -403,6 +388,9 @@ export async function store(text: string, daily = false): Promise<string> {
 			console.error(`[cortex/memory] PAI dual-write failed (non-fatal): ${(e as Error).message}`);
 		}
 
+		// Phase 8.3: Update entity graph from stored text
+		updateGraph(text, `store-daily-${today}`).catch(() => {});
+
 		return `Stored in daily/${today}.md`;
 	}
 
@@ -414,7 +402,11 @@ export async function store(text: string, daily = false): Promise<string> {
 		type: "core",
 		text,
 		timestamp: new Date().toISOString(),
+		granularity: "chunk",
 	});
+
+	// Phase 8.3: Update entity graph
+	updateGraph(text, `store-core-${Date.now()}`).catch(() => {});
 
 	return "Stored in MEMORY.md";
 }
@@ -428,7 +420,7 @@ async function addToIndex(text: string, metadata: ItemMetadata): Promise<void> {
 
 	try {
 		const vector = await getEmbedding(text);
-		if (!vector) return; // No embedding available — skip silently
+		if (!vector) return;
 		// Strip undefined values — Vectra MetadataTypes doesn't include undefined
 		const cleanMeta = Object.fromEntries(
 			Object.entries(metadata).filter(([, v]) => v !== undefined)
@@ -441,14 +433,13 @@ async function addToIndex(text: string, metadata: ItemMetadata): Promise<void> {
 
 /**
  * Rebuild vector index from all memory files.
+ * Phase 8.4: Indexes at three granularity levels (document, section, chunk).
  */
 export async function reindex(): Promise<{ totalChunks: number; files: string[] }> {
 	await init();
 
-	// Ensure we can produce embeddings (local model if no Gemini key)
-	if (!geminiKey) {
-		await loadLocalEmbeddingModel();
-	}
+	// Ensure local model is ready
+	await loadLocalEmbeddingModel();
 
 	// Clear and recreate
 	if (existsSync(INDEX_DIR)) {
@@ -465,25 +456,33 @@ export async function reindex(): Promise<{ totalChunks: number; files: string[] 
 
 	async function indexFile(filename: string, content: string, type: string): Promise<number> {
 		let count = 0;
-		// Document-level chunk (whole file for date-range / summary queries)
+
+		// Phase 8.4: Document-level (whole file → date-range and summary queries)
 		if (content.trim().length > 20) {
-			await addToIndex(content.trim(), { source: filename, type, text: content.trim(), timestamp: ts, granularity: "document" });
+			// For document level, truncate to first 2000 chars to keep embedding meaningful
+			const docText = content.trim().slice(0, 2000);
+			await addToIndex(docText, { source: filename, type, text: docText, timestamp: ts, granularity: "document" });
 			count++;
 		}
-		// Section-level chunks (split on ## headings)
+
+		// Phase 8.4: Section-level (## headings → topic clusters)
 		const sections = content.split(/\n(?=##[^#])/).filter((s) => s.trim().length > 20);
 		if (sections.length > 1) {
 			for (const section of sections) {
-				await addToIndex(section.trim(), { source: filename, type, text: section.trim(), timestamp: ts, granularity: "section" });
+				const sectionText = section.trim().slice(0, 1000);
+				await addToIndex(sectionText, { source: filename, type, text: sectionText, timestamp: ts, granularity: "section" });
 				count++;
 			}
 		}
-		// Chunk-level chunks (paragraph splitting)
+
+		// Phase 8.4: Chunk-level (paragraphs → specific facts)
 		const chunks = content.split("\n\n").filter((c) => c.trim().length > 20);
 		for (const chunk of chunks) {
-			await addToIndex(chunk.trim(), { source: filename, type, text: chunk.trim(), timestamp: ts, granularity: "chunk" });
+			const chunkText = chunk.trim().slice(0, 512);
+			await addToIndex(chunkText, { source: filename, type, text: chunkText, timestamp: ts, granularity: "chunk" });
 			count++;
 		}
+
 		return count;
 	}
 
@@ -508,7 +507,6 @@ export async function reindex(): Promise<{ totalChunks: number; files: string[] 
 	}
 
 	// PAI shared memory: relationship notes, learning, pi daily summaries
-	// Excludes WORK/ and STATE/ to avoid PRD boilerplate noise in search results
 	for (const subdir of ["RELATIONSHIP", "LEARNING", "DAILY"]) {
 		const paiSubDir = join(PAI_MEMORY_DIR, subdir);
 		if (!existsSync(paiSubDir)) continue;
@@ -544,9 +542,9 @@ export async function status(): Promise<{
 	const dailyFiles = (await glob(join(DAILY_DIR, "*.md"))).length;
 
 	return {
-		hasKey: !!geminiKey || usingLocalEmbeddings,
+		hasKey: true,
 		hasIndex: index ? await index.isIndexCreated() : false,
-		embeddingModel: geminiKey ? GEMINI_EMBEDDING_MODEL : `${LOCAL_EMBEDDING_MODEL} (local)`,
+		embeddingModel: `${LOCAL_EMBEDDING_MODEL} (local)`,
 		memoryDir: MEMORY_DIR,
 		coreFiles,
 		dailyFiles,

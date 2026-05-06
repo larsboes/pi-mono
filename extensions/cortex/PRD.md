@@ -2,7 +2,7 @@
 
 ## PRD + Build Plan
 
-**Status:** Phases 1-7 implemented, Phase 8.1 (cross-encoder reranking) complete — ready for 8.2 query intent classification
+**Status:** Phases 1-8 complete. All retrieval quality improvements shipped.
 **Location:** `~/Developer/pi/pi-mono/extensions/cortex/`
 **Type:** Standalone npm package (installable via `pi install` or symlink)
 **Author:** Lars Boes + Jarvis
@@ -203,103 +203,62 @@ The `~/.pi/agent/extensions/memory-bootstrap.ts` file has been deleted. Cortex's
 - [x] Deleted `~/.pi/agent/extensions/memory-bootstrap.ts`
 - [x] Cortex now provides strict superset: hot context (pi-mem style) + semantic search
 
-### Phase 8: Retrieval Quality Improvements
+### Phase 8: Retrieval Quality Improvements ✅ COMPLETE
 
-Current retrieval suffers from: false positives (old logs with similar wording), poor ranking (no nuance between "session activity tracker" as system vs generic sessions), lack of query understanding.
+All 6 sub-phases implemented as an integrated pipeline in `memory.ts`:
+
+```
+Query → Vector/Keyword Retrieval → Intent Classification (8.2)
+      → Granularity Filter (8.4) → Intent-Weighted Scoring (8.2)
+      → Entity Graph Expansion (8.3) → Session Context Boost (8.5)
+      → Personal Weight Adjustment (8.6) → Cross-Encoder Reranking (8.1)
+      → Final Results
+```
 
 #### Phase 8.1: Cross-Encoder Reranking ✅ COMPLETE
-- **Problem:** Bi-encoder embeddings capture coarse similarity but miss fine-grained relevance (e.g., "cortex bugs" should surface session.ts edits even without "bugs" in text)
-- **Solution:** Two-stage retrieval:
-  1. Fast bi-encoder (Gemini) retrieves candidate set (top-20)
-  2. Cross-encoder scores query↔document pairs with cosine similarity, reranks top-10
-- **Implementation:**
-  - [x] Add `src/rerank.ts` using `@xenova/transformers` with `Xenova/all-MiniLM-L6-v2` model
-  - [x] Modify `memory_search` to accept `rerank: boolean` parameter
-  - [x] Cache cross-encoder results in `~/.pi/memory/cortex/rerank-cache.json` (TTL: 1 hour)
-  - [x] Combined scoring: 30% vector + 70% rerank
-- **Performance:** ~50ms for 10 candidates (after ~3s cold start for model download)
-- **Results:** Shows both scores: `vector:0.65 rerank:0.68` — today's entries correctly boosted
+- [x] `src/rerank.ts` using `@xenova/transformers` with `Xenova/all-MiniLM-L6-v2` model
+- [x] Rerank enabled by default for before_agent_start injection
+- [x] Combined scoring: 30% vector + 70% rerank
+- [x] Cache with 1h TTL, ~50ms warm latency
 
-**Phase 8.1 Potential Refinements** (documented for future, proceeding to 8.2):
-| Refinement | Impact | Effort | Notes |
-|------------|--------|--------|-------|
-| True cross-attention (joint query+doc embedding) | High | Medium | Current uses bi-encoder similarity; true cross-encoder ~3-5x slower but more precise |
-| Dynamic weighting (learn 30/70 split from feedback) | Medium | Low | Requires 8.6 feedback loop first |
-| Cache warming (pre-load model at session start) | Low | Trivial | Eliminates 3s cold start on first query |
-| Query complexity routing (skip rerank for exact paths) | Low | Low | Save 50ms on `/memory search ~/exact/path.md` |
-| Progress UI during model download | Low | Trivial | Add `ctx.ui.setStatus()` updates |
-| Score calibration (ensure 0.3 vs 0.7 means something) | Low | Medium | Normalize across query types |
-| RAM unloading after idle (10min timeout) | Low | Trivial | Free memory if no searches |
+#### Phase 8.2: Query Intent Classification ✅ COMPLETE
+- [x] `src/intent.ts` — multi-pattern regex classifier with confidence scores
+- [x] 6 intent categories: recall, learn, debug, navigate, create, general
+- [x] Auto-granularity routing based on intent + confidence
+- [x] Per-intent weight vectors (recencyBias, skillBoost, errorBoost, pathBoost, codeBoost)
+- [x] Source categorization: daily, skill, error, code, path, other
+- [x] Intent + confidence shown in tool output for transparency
 
-**Decision:** Skip refinements, proceed to 8.2. Current quality boost is significant, 50ms latency acceptable.
+#### Phase 8.3: Entity Graph Traversal ✅ COMPLETE
+- [x] `src/graph.ts` — co-occurrence graph with recency-weighted edges
+- [x] Entity types: file, skill, concept, package, tool, error
+- [x] Graph updated on: memory.store(), session.flushSession(), agent_end
+- [x] BFS traversal with recency-weighted scoring (7d half-life)
+- [x] Automatic pruning: stale nodes (60d) and edge cap (2000)
+- [x] Graduated boost in search: more entity matches = bigger boost (cap 0.2)
 
-#### Phase 8.2: Query Intent Classification
-- **Problem:** Same query structure means different things in different contexts ("what did we do about X" vs "how does Y work" vs "why did Z fail")
-- **Solution:** Classify query intent before retrieval, route to different strategies:
-  - **Recall** ("what did we do...") → high recency bias, session summaries, tool outputs
-  - **Learn** ("how does...") → prioritize skills, code blocks, SKILL.md files
-  - **Debug** ("why did... fail") → prioritize error logs, bash outputs, edit diffs
-  - **Navigate** ("find the file...") → prioritize file paths, ls/grep tool outputs
-- **Implementation:**
-  - Add `src/intent.ts` with lightweight classifier (can be rule-based + few-shot Gemini)
-  - Add `intent` field to memory metadata during storage
-  - Modify `memory_search` to accept `intent?: 'recall' | 'learn' | 'debug' | 'navigate'`
-- **Success metric:** Search results match task type (debug queries surface errors first)
+#### Phase 8.4: Hierarchical Multi-Granularity Index ✅ COMPLETE
+- [x] Three-level indexing during reindex: document (2000 chars), section (## headers, 1000 chars), chunk (paragraphs, 512 chars)
+- [x] `granularity` metadata stored with each vector entry
+- [x] Auto-routing: intent drives preferred granularity (recall→document, debug→chunk, learn→section)
+- [x] Filter applied only when confident (>0.5) and doesn't eliminate too many results
+- [x] `memory_search` tool exposes explicit granularity parameter
 
-#### Phase 8.3: Entity Graph Traversal
-- **Problem:** Memories reference entities (files, skills, concepts) but these relationships are implicit
-- **Solution:** Extract entities, build graph, traverse for related memories:
-  - Entities: files (`session.ts`), skills (`security-audit`), concepts (`cross-encoder`), people mentioned
-  - Edges: co-occurrence in same session, explicit references, tool call chains
-  - Traversal: query mentions `cortex` → graph finds `session.ts` → finds edits → surfaces relevant logs
-- **Implementation:**
-  - Add `src/graph.ts` with entity extraction (regex + Gemini for concept extraction)
-  - Store graph in `~/.pi/memory/cortex/graph.json` (nodes + edges)
-  - Modify `memory_search` to do graph expansion: query → extract entities → traverse 2 hops → merge with vector results
-- **Success metric:** Finding related work without explicit keyword overlap
+#### Phase 8.5: Session Context Injection ✅ COMPLETE
+- [x] `session.ts` provides `getContextEntities()` — recency-ordered files + skills + tools
+- [x] Tool usage tracked alongside files and skills
+- [x] Activity density metric (activities/min) for future dynamic boost tuning
+- [x] Context entities passed to search pipeline, boost matching results (cap 0.2)
+- [x] `before_agent_start` uses session context for implicit query expansion
 
-#### Phase 8.4: Hierarchical Multi-Granularity Index
-- **Problem:** Current chunking is flat (paragraphs). Some queries need document-level context ("what did I do Tuesday"), others need specific facts.
-- **Solution:** Index at 3 levels:
-  - **Document**: Full daily log → for date-range queries, session summaries
-  - **Section**: ## headers within logs → for topic clusters ("cortex architecture")
-  - **Chunk**: Paragraph/sentence → for specific facts
-- **Implementation:**
-  - Modify `memory.ts` index building to create 3 indices with parent-child links
-  - Add `granularity: 'document' | 'section' | 'chunk'` parameter to `memory_search`
-  - Retrieve coarse→fine: find relevant section, then best chunks within it
-- **Success metric:** Date queries return full-day summaries; specific queries return precise facts
-
-#### Phase 8.5: Session Context Injection
-- **Problem:** Current retrieval ignores current session state (files open, recent tools, crystallized skills)
-- **Solution:** Use current session as implicit query expansion:
-  - Extract entities from current session (files touched, tools used, active project)
-  - Boost memories sharing those entities (not just time-based)
-  - Hybrid score: `semantic_similarity * contextual_overlap_boost`
-- **Implementation:**
-  - Add `getSessionContext()` in `session.ts` returning current entities
-  - Modify `before_agent_start` hook to inject session context into search
-  - Modify scoring in `memory.ts` to apply boost for entity overlap
-- **Success metric:** Context injection surfaces memories related to current work without explicit query
-
-#### Phase 8.6: Feedback Loop (Online Learning)
-- **Problem:** Relevance is personal — what you click vs ignore reveals preferences
-- **Solution:** Track interactions, adapt retrieval:
-  - Log: query → results → which result user clicked/expanded vs ignored
-  - Adjust: move clicked results closer to query in embedding space (vector offset)
-  - Personalize: per-user "relevance vector" that adjusts all searches
-- **Implementation:**
-  - Add `src/feedback.ts` with interaction logging
-  - Store feedback in `~/.pi/memory/cortex/feedback.json`
-  - Periodically (nightly) compute personal relevance adjustments, apply to search
-- **Success metric:** Over time, top-3 results are clicked more often
-
-#### Phase 8 Execution Order
-1. **Start with 8.1** (cross-encoder) — 80/20 impact, validates two-stage architecture
-2. **Then 8.2** (intent classification) — builds on 8.1's routing infrastructure
-3. **8.3 + 8.5** can be parallel (graph + context injection are independent)
-4. **8.4** after graph (uses similar entity extraction)
-5. **8.6** last (requires mature usage data)
+#### Phase 8.6: Feedback Loop ✅ COMPLETE
+- [x] `src/feedback.ts` — interaction logging with time-decay (14d half-life)
+- [x] Exponential decay: recent interactions matter more than old ones
+- [x] Sigmoid-based weight curve [0.7, 1.3] instead of hard thresholds
+- [x] Staleness pruning: interactions >30d removed on compaction
+- [x] Negative signals from correction-learning (2x weight for negatives)
+- [x] `src/correction.ts` + `src/rules.ts` — aborted turn detection + `/learn` command
+- [x] Per-project and global correction rules injected into system prompt
 
 ---
 
@@ -350,16 +309,16 @@ Current retrieval suffers from: false positives (old logs with similar wording),
 ## Open Questions
 
 ### Decided
-- [x] Embedding model: stick with Gemini for now (free tier sufficient, good quality)
+- [x] Embedding model: local only (`Xenova/all-MiniLM-L6-v2`) — no external API calls, privacy-first
 - [x] Pattern threshold: 3 occurrences for crystallization candidate flag
-
-### Active (Phase 8)
-- [ ] Cross-encoder: use Gemini Flash vs local distilled model (latency vs privacy)?
-- [ ] Intent classification: rule-based + few-shot vs fine-tuned classifier?
-- [ ] Graph storage: JSON file (simple) vs embedded DB (performance at scale)?
-- [ ] Feedback loop: immediate vector adjustment vs batch nightly updates?
+- [x] Cross-encoder: local model (same MiniLM-L6-v2) — 50ms latency, no API calls
+- [x] Intent classification: rule-based regex with confidence scoring — deterministic, zero latency
+- [x] Graph storage: JSON file — simple, sufficient for personal use (<500 nodes)
+- [x] Feedback loop: immediate weight computation with 1min cache — responsive, no batch jobs
 
 ### Future
 - [ ] Capability inventory format: structured YAML vs prose Markdown?
 - [ ] Should Cortex have its own settings in `~/.pi/agent/pi-cortex-settings.json`?
 - [ ] Cross-session pattern tracking: per-project or global?
+- [ ] True cross-encoder (joint embedding) vs current bi-encoder reranking?
+- [ ] Dynamic rerank weight learning from feedback data?

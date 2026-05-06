@@ -6,7 +6,7 @@ import { join as joinPath } from "node:path";
 import { homedir as getHome } from "node:os";
 import * as memory from "./src/memory.js";
 import * as context from "./src/context.js";
-import { classifyIntent } from "./src/intent.js";
+import { classifyIntentFull } from "./src/intent.js";
 import * as scratchpad from "./src/scratchpad.js";
 import * as correction from "./src/correction.js";
 import * as rules from "./src/rules.js";
@@ -56,17 +56,16 @@ export default function cortex(pi: ExtensionAPI) {
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
-		// Phase 7+: Full context injection — hot context + semantic search + self-extension status
+		// Phase 7+8: Full context injection — hot context + semantic search + self-extension status
 		try {
-			const sessionCtx = session.getSessionContext();
-			const contextEntities = [...sessionCtx.files, ...sessionCtx.skills];
-			const intent = classifyIntent(event.prompt);
+			// Phase 8.5: Get session context entities (recency-weighted)
+			const contextEntities = session.getContextEntities();
+			// Phase 8.2: Full intent classification with confidence + auto-granularity
+			const intentResult = classifyIntentFull(event.prompt);
 			const [semanticResults, hotCtx, extensionStatus] = await Promise.all([
 				// Phase 8.1: rerank on by default for the top-3 injected memories.
-				// Cold start ~3s (one-time model download), warm ~50ms — acceptable for
-				// the per-message hot path given the precision improvement.
 				memory.search(event.prompt, 3, {
-					intent,
+					intent: intentResult.intent,
 					rerank: true,
 					contextEntities: contextEntities.length > 0 ? contextEntities : undefined,
 				}),
@@ -74,11 +73,12 @@ export default function cortex(pi: ExtensionAPI) {
 				selfExtension.buildStatus(),
 			]);
 
-			// Phase 8.6: log injection-time retrieval as a (weak) interaction signal.
+			// Phase 8.6: log injection-time retrieval as an interaction signal.
 			feedback.logInteraction(
 				event.prompt,
 				semanticResults.map((r) => r.source),
 				ctx.sessionManager.getSessionId(),
+				intentResult.intent,
 			).catch(() => {});
 
 			const hotBlock = context.formatHotContext(hotCtx);
@@ -290,22 +290,14 @@ export default function cortex(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			try {
-				const intent = classifyIntent(params.query);
-				const sessionCtx = session.getSessionContext();
-				const contextEntities = [...sessionCtx.files, ...sessionCtx.skills];
+				const intentResult = classifyIntentFull(params.query);
+				const contextEntities = session.getContextEntities();
 				const results = await memory.search(params.query, params.limit ?? 5, {
 					rerank: params.rerank ?? false,
-					intent,
+					intent: intentResult.intent,
 					granularity: params.granularity as "document" | "section" | "chunk" | undefined,
 					contextEntities: contextEntities.length > 0 ? contextEntities : undefined,
 				});
-				// Phase 8.6: log retrieval for personal-weight learning. Capped at top results
-				// inside feedback.logInteraction (TOP_K=3). Best-effort, never throws.
-				feedback.logInteraction(
-					params.query,
-					results.map((r) => r.source),
-					ctx.sessionManager.getSessionId(),
-				).catch(() => {});
 				if (results.length === 0) {
 					return {
 						content: [{ type: "text" as const, text: "No relevant memories found." }],
@@ -319,13 +311,13 @@ export default function cortex(pi: ExtensionAPI) {
 								? `, rerank: ${r.rerankScore.toFixed(2)}`
 								: "";
 							const granInfo = r.granularity ? `, ${r.granularity}` : "";
-							return `${i + 1}. [${r.source}] (score: ${r.score.toFixed(2)}${rerankInfo}${granInfo}, ${r.method}, intent: ${intent})\n${r.text}`;
+							return `${i + 1}. [${r.source}] (score: ${r.score.toFixed(2)}${rerankInfo}${granInfo}, ${r.method}, intent: ${intentResult.intent}/${intentResult.confidence.toFixed(2)})\n${r.text}`;
 						},
 					)
 					.join("\n\n");
 				return {
 					content: [{ type: "text" as const, text: formatted }],
-					details: { resultCount: results.length, intent },
+					details: { resultCount: results.length, intent: intentResult.intent, confidence: intentResult.confidence },
 				};
 			} catch (e) {
 				return {
@@ -948,7 +940,7 @@ export default function cortex(pi: ExtensionAPI) {
 					if (stats) {
 						emitCommandFeedback(
 							ctx,
-							`Session: ${stats.activityCount} activities | ${stats.filesTouched} files | ${stats.skillsUsed} skills | ${stats.duration}m`,
+							`Session: ${stats.activityCount} activities | ${stats.filesTouched} files | ${stats.skillsUsed} skills | ${stats.toolsUsed} tools | ${stats.duration}m | density: ${stats.density.toFixed(1)}/min`,
 							"info",
 						);
 					} else {
