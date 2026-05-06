@@ -26,6 +26,7 @@ The editor can be replaced temporarily by built-in UI such as `/settings` or by 
 | Shell command | `!command` runs and sends output to the model |
 | Hidden shell command | `!!command` runs without sending output to the model |
 | External editor | Ctrl+G opens `$VISUAL` or `$EDITOR` |
+| Draft persistence | Unsent text is saved on shutdown and restored when you resume the session |
 
 See [Keybindings](keybindings.md) for all shortcuts and customization.
 
@@ -47,6 +48,7 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/fork` | Create a new session from a previous user message |
 | `/clone` | Duplicate the current active branch into a new session |
 | `/compact [prompt]` | Manually compact context, optionally with custom instructions |
+| `/retry` | Retry the last turn (re-send the last user message) |
 | `/copy` | Copy last assistant message to clipboard |
 | `/export [file]` | Export session to HTML |
 | `/share` | Upload as private GitHub gist with shareable HTML link |
@@ -185,7 +187,7 @@ cat README.md | pi -p "Summarize this text"
 | `--no-builtin-tools`, `-nbt` | Disable built-in tools but keep extension/custom tools enabled |
 | `--no-tools`, `-nt` | Disable all tools |
 
-Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
+Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`, `search_tools`.
 
 ### Resource Options
 
@@ -267,6 +269,18 @@ pi --tools read,grep,find,ls -p "Review the code"
 | `PI_TELEMETRY` | Override install/update telemetry: `1`/`true`/`yes` or `0`/`false`/`no`. This does not disable update checks |
 | `PI_CACHE_RETENTION` | Set to `long` for extended prompt cache where supported |
 | `VISUAL`, `EDITOR` | External editor for Ctrl+G |
+
+## Smart Features
+
+These are built into the core and work automatically:
+
+| Feature | What it does |
+|---------|-------------|
+| **Workspace tree** | A directory tree of your project is included in the system prompt, so the agent knows the structure without running `ls` |
+| **Tool discovery** | The `search_tools` tool lets the agent find capabilities by description (e.g. "kubernetes" → matching MCP tools). Uses BM25 ranking |
+| **Auto-retry** | Network errors (5xx, socket hang-up, rate limits) trigger automatic retry with exponential backoff |
+| **Error hints** | When errors occur, actionable remediation steps are shown (e.g. which env var to set, which command to run) |
+| **Draft persistence** | If you quit with text in the editor, it's restored when you resume the same session |
 
 ## Design Principles
 
