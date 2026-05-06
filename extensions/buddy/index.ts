@@ -12,6 +12,7 @@
  *   /buddy gallery   — Browse all 18 species
  *   /buddy show      — Show widget above editor
  *   /buddy hide      — Hide widget
+ *   /buddy toggle    — Toggle widget visibility
  *
  * Your buddy animates during turns and lives across sessions.
  */
@@ -55,7 +56,7 @@ export default function buddy(pi: ExtensionAPI) {
 			return;
 		}
 		const lines = renderWidget(ctx.ui.theme, bones, data.name, frame);
-		ctx.ui.setWidget("buddy", lines, { placement: "belowEditor" });
+		ctx.ui.setWidget("buddy", lines, { placement: "aboveEditor" });
 	}
 
 	function startAnimation(ctx: any) {
@@ -98,7 +99,7 @@ export default function buddy(pi: ExtensionAPI) {
 	// ── Command ──────────────────────────────────────────────────
 
 	pi.registerCommand("buddy", {
-		description: "Your pi companion — show card, rename, reroll, gallery, show/hide",
+		description: "Your pi companion — show card, rename, reroll, gallery, show/hide/toggle",
 		handler: async (args, ctx) => {
 			const sub = args?.trim().toLowerCase() ?? "";
 
@@ -175,6 +176,15 @@ export default function buddy(pi: ExtensionAPI) {
 				saveBuddy(data);
 				updateWidget(ctx);
 				ctx.ui.notify("Buddy widget hidden", "info");
+				return;
+			}
+
+			// /buddy toggle
+			if (sub === "toggle") {
+				data.widgetVisible = !data.widgetVisible;
+				saveBuddy(data);
+				updateWidget(ctx);
+				ctx.ui.notify(data.widgetVisible ? "Buddy widget visible" : "Buddy widget hidden", "info");
 				return;
 			}
 
