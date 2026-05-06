@@ -36,6 +36,38 @@ function fmtPct(n: number): string {
 	return `${(n * 100).toFixed(1)}%`;
 }
 
+function fmtTokens(n: number): string {
+	if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+	return `${n}`;
+}
+
+/** Render a sparkline from an array of values (max 20 points). */
+function sparkline(values: number[]): string {
+	if (values.length === 0) return "";
+	const chars = "▁▂▃▄▅▆▇█";
+	const max = Math.max(...values, 1);
+	const min = Math.min(...values);
+	const range = max - min || 1;
+	// Take last 20 points
+	const recent = values.slice(-20);
+	return recent.map((v) => chars[Math.min(7, Math.floor(((v - min) / range) * 7))]).join("");
+}
+
+/** Simple trend indicator comparing recent vs older halves. */
+function trend(values: number[]): string {
+	if (values.length < 4) return "";
+	const mid = Math.floor(values.length / 2);
+	const older = values.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+	const newer = values.slice(mid).reduce((a, b) => a + b, 0) / (values.length - mid);
+	if (older === 0 && newer === 0) return "─";
+	const pctChange = older > 0 ? ((newer - older) / older) * 100 : 100;
+	if (pctChange > 15) return `↑${Math.round(pctChange)}%`;
+	if (pctChange < -15) return `↓${Math.round(Math.abs(pctChange))}%`;
+	return "→";
+}
+
 let runningServer: { port: number; stop: () => void } | null = null;
 
 export default function statsExtension(pi: ExtensionAPI): void {
@@ -128,13 +160,46 @@ export default function statsExtension(pi: ExtensionAPI): void {
 				const o = stats.overall;
 				const firstDate = o.firstTimestamp ? new Date(o.firstTimestamp).toISOString().slice(0, 10) : "-";
 				const lastDate = o.lastTimestamp ? new Date(o.lastTimestamp).toISOString().slice(0, 10) : "-";
+
+				// Sparklines from time series
+				const costValues = stats.costSeries.map((p) => p.cost);
+				const reqValues = stats.timeSeries.map((p) => p.requests);
+				const costSpark = sparkline(costValues);
+				const reqSpark = sparkline(reqValues);
+				const costTrend = trend(costValues);
+				const reqTrend = trend(reqValues);
+
+				// Source breakdown
+				const piModels = stats.byModel.filter((m) => m.source === "pi");
+				const ccModels = stats.byModel.filter((m) => m.source === "claude-code");
+				const piReqs = piModels.reduce((a, m) => a + m.totalRequests, 0);
+				const ccReqs = ccModels.reduce((a, m) => a + m.totalRequests, 0);
+				const piCost = piModels.reduce((a, m) => a + m.totalCost, 0);
+				const ccCost = ccModels.reduce((a, m) => a + m.totalCost, 0);
+				const piTokens = piModels.reduce((a, m) => a + m.totalInputTokens + m.totalOutputTokens, 0);
+				const ccTokens = ccModels.reduce((a, m) => a + m.totalInputTokens + m.totalOutputTokens, 0);
+
 				const summary = [
 					`AI Usage (${windowLabel}):`,
-					`  Range:    ${firstDate} → ${lastDate}`,
-					`  Requests: ${o.totalRequests.toLocaleString()} (${o.failedRequests} errors, ${fmtPct(o.errorRate)} error rate)`,
-					`  Tokens:   ${(o.totalInputTokens + o.totalOutputTokens).toLocaleString()} (${fmtPct(o.cacheRate)} cache)`,
-					`  Cost:     ${fmtCost(o.totalCost)}`,
-					`  (use /stats models, /stats folders, or /stats dashboard for detail)`,
+					`  Range:     ${firstDate} → ${lastDate}`,
+					`  Requests:  ${o.totalRequests.toLocaleString()} (${o.failedRequests} errors, ${fmtPct(o.errorRate)} err rate)`,
+					`  Tokens:    ${fmtTokens(o.totalInputTokens + o.totalOutputTokens)} (${fmtPct(o.cacheRate)} cache hit)`,
+					`  Cost:      ${fmtCost(o.totalCost)}`,
+					``,
+					`  Sources:`,
+					`    pi:          ${piReqs.toLocaleString()} reqs │ ${fmtTokens(piTokens)} tok │ ${fmtCost(piCost)}`,
+					`    claude-code:  ${ccReqs.toLocaleString()} reqs │ ${fmtTokens(ccTokens)} tok │ ${fmtCost(ccCost)}`,
+					``,
+					...(costSpark ? [`  Cost:  ${costSpark} ${costTrend}`] : []),
+					...(reqSpark ? [`  Reqs:  ${reqSpark} ${reqTrend}`] : []),
+					``,
+					`  Top Models:`,
+					...stats.byModel.slice(0, 5).map((m) => {
+						const badge = m.source === "claude-code" ? "CC" : "pi";
+						return `    [${badge}] ${m.model}: ${m.totalRequests.toLocaleString()} reqs, ${fmtCost(m.totalCost)}`;
+					}),
+					``,
+					`  (/stats models, /stats folders, /stats dashboard for detail)`,
 				].join("\n");
 				notify(ctx, summary);
 			} catch (err) {
