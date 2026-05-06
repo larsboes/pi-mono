@@ -86,17 +86,34 @@ git push origin main
 
 ---
 
+## Additive Core Features (new files, no upstream conflict)
+
+These are new files in `packages/coding-agent/src/core/` — upstream has nothing at these paths.
+
+| File | Feature |
+|------|---------||
+| `workspace-tree.ts` | Depth-3, 80-line-capped project tree injected into `<workspace-tree>` in system prompt |
+| `tool-discovery.ts` | BM25 search engine for tool discovery (field-weighted: name:6, desc:3, params:1) |
+| `tools/search-tools.ts` | `search_tools` builtin tool — agent can discover tools via natural language |
+| `error-hints.ts` | 14 regex pattern matchers that map errors → actionable remediation hints |
+
+Session manager additions (`session-manager.ts`): `saveDraft()` / `loadDraft()` for editor draft persistence.
+Slash commands: `/retry` added.
+System prompt: `<workspace-tree>` injection + error hints in `showError()`.
+
+---
+
 ## Additive Directories (no upstream conflict risk)
 
 These are entirely new — upstream has nothing in these paths, so they never conflict on merge.
 
 | Directory | Purpose |
 |-----------|---------|
-| `extensions/` | 9 public pi extensions (swarm, stats, cortex, mitsupi, pai, buddy, mcp-adapter, web-access, markdown-preview) |
+| `extensions/` | 11 public pi extensions (cortex, web-access, mcp-adapter, mitsupi, markdown-preview, stats, swarm, pai, buddy, ultra, image-ai) |
 | `add-docs/` | Fork-specific documentation (architecture.md, extensions.md) |
 | `scripts/link-extensions.sh` | Setup script — symlinks extensions + unified memory to `~/.pi/` and `~/.pai/` |
 | `ADDITIONS.md` | This file |
-| `PLAN.md` | Planned work (pi_agent_rust conformance, omp mining, unified stats, swarm testing) |
+| `PLAN.md` | Roadmap (backlog, vision features, monitoring) |
 
 See `extensions/README.md` for attribution and `add-docs/` for architecture details.
 
