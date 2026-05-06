@@ -171,7 +171,7 @@ export function formatErrorWithHints(errorMessage: string): string {
 
 	let result = errorMessage;
 	if (hint.hints.length > 0) {
-		result += "\n" + hint.hints.map((h) => `  → ${h}`).join("\n");
+		result += `\n${hint.hints.map((h) => `  → ${h}`).join("\n")}`;
 	}
 	return result;
 }
