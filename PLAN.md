@@ -76,7 +76,7 @@
 |---|---------|--------|--------|-------------|
 | 21 | **SQLite Session Index** | Rust | 4-6h | Structured index on sessions (by CWD, timestamp, name) without scanning JSONL. Faster `/sessions` at scale. |
 | 22 | **ACP (Agent Client Protocol)** | Rust | Days | JSON-RPC 2.0 protocol for IDE integration (Zed-style). Expose pi as a backend for editors via stdio. |
-| 23 | **Tool Output Pruning** | OMP | 3-4h | Before compaction, prune old tool outputs (keep last 40k tokens intact, replace older with `[truncated - N tokens]`). Protected tools: read, skill. |
+| 23 | **Tool Output Pruning** | OMP | — | ✅ Already implemented — `compaction/pruning.ts` walks entries newest-to-oldest, protects last 40k tokens + `read`/`skill` tools, replaces older with `[truncated - N tokens]`. Runs before model compaction. |
 | 24 | **Flake Classifier for CI** | Rust | 2h | Classify test failures as deterministic vs transient (timeout, FS contention, port conflict). Auto-retry flaky tests. |
 | 25 | **Session Metrics (Perf Telemetry)** | Rust | 2-3h | Atomic timing counters for save/load/serialize. Gated behind env var. Useful for debugging slow sessions. |
 | 26 | **Content-Based Todo Matching** | OMP | 2h | Match todos by name/content (prefix/substr) instead of IDs. More natural for the model. |
