@@ -11,6 +11,7 @@ import {
 	readFileSync,
 	readSync,
 	statSync,
+	unlinkSync,
 	writeFileSync,
 } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
@@ -796,6 +797,40 @@ export class SessionManager {
 
 	getSessionFile(): string | undefined {
 		return this.sessionFile;
+	}
+
+	/** Path to the editor draft file for this session */
+	private get draftFile(): string {
+		return join(this.getSessionDir(), `.draft_${this.sessionId}`);
+	}
+
+	/** Save editor draft text (call on shutdown) */
+	saveDraft(text: string): void {
+		if (!text.trim()) {
+			// Remove draft if empty
+			try {
+				unlinkSync(this.draftFile);
+			} catch {
+				// Ignore if doesn't exist
+			}
+			return;
+		}
+		try {
+			writeFileSync(this.draftFile, text, "utf-8");
+		} catch {
+			// Best effort
+		}
+	}
+
+	/** Load and consume editor draft (returns text and deletes the file) */
+	loadDraft(): string | null {
+		try {
+			const text = readFileSync(this.draftFile, "utf-8");
+			unlinkSync(this.draftFile);
+			return text || null;
+		} catch {
+			return null;
+		}
 	}
 
 	_persist(entry: SessionEntry): void {

@@ -58,6 +58,7 @@ import {
 } from "../../config.js";
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
 import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
+import { formatErrorWithHints } from "../../core/error-hints.js";
 import type {
 	AutocompleteProviderFactory,
 	EditorFactory,
@@ -655,6 +656,12 @@ export class InteractiveMode {
 
 		// Render initial messages AFTER showing loaded resources
 		this.renderInitialMessages();
+
+		// Restore editor draft from previous session (if any)
+		const draft = this.sessionManager.loadDraft();
+		if (draft && !this.editor.getText().trim()) {
+			this.editor.setText(draft);
+		}
 
 		// Set up theme file watcher
 		onThemeChange(() => {
@@ -2900,8 +2907,9 @@ export class InteractiveMode {
 					if (event.reason === "manual") {
 						this.showError(event.errorMessage);
 					} else {
+						const enhanced = formatErrorWithHints(event.errorMessage);
 						this.chatContainer.addChild(new Spacer(1));
-						this.chatContainer.addChild(new Text(theme.fg("error", event.errorMessage), 1, 0));
+						this.chatContainer.addChild(new Text(theme.fg("error", enhanced), 1, 0));
 					}
 				}
 				void this.flushCompactionQueue({ willRetry: event.willRetry });
@@ -3234,6 +3242,12 @@ export class InteractiveMode {
 		this.isShuttingDown = true;
 		this.unregisterSignalHandlers();
 
+		// Save editor draft for later resume
+		const editorText = this.editor.getText();
+		if (editorText.trim()) {
+			this.sessionManager.saveDraft(editorText);
+		}
+
 		// Drain any in-flight Kitty key release events before stopping.
 		// This prevents escape sequences from leaking to the parent shell over slow SSH.
 		await this.ui.terminal.drainInput(1000);
@@ -3511,8 +3525,9 @@ export class InteractiveMode {
 	}
 
 	showError(errorMessage: string): void {
+		const enhanced = formatErrorWithHints(errorMessage);
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new Text(theme.fg("error", `Error: ${errorMessage}`), 1, 0));
+		this.chatContainer.addChild(new Text(theme.fg("error", `Error: ${enhanced}`), 1, 0));
 		this.ui.requestRender();
 	}
 
