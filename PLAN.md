@@ -68,7 +68,7 @@
 | 17 | **Tree-Sitter Code Summarization** | OMP | 6-8h | `read` tool supports `summarize` mode — shows function/class/method signatures without bodies. Requires N-API native binding (tree-sitter). Massive context savings for large files. |
 | 18 | **Eval Framework (replace python via bash)** | OMP | 4-6h | Fenced `eval.py`/`eval.js` cells in sandboxed VM. Safer than raw bash for computation. |
 | 19 | **Read-Only Tool Parallelism** | Rust | — | ✅ Already implemented — Agent core defaults to `toolExecution: "parallel"`. All tools run concurrently via `Promise.all` unless explicitly marked `executionMode: "sequential"`. |
-| 20 | **Background Compaction Worker** | Rust | 4-6h | Run LLM compaction off the foreground turn path with quota controls (cooldown, timeout, max_attempts). Smoother UX — no blocking compaction pauses. |
+| 20 | **Background Compaction Worker** | Rust | Low priority | Compaction already runs async (user can type during it, messages queue). True background thread only marginally better in Node/Bun. Skip unless compaction duration becomes a pain point. |
 
 ### Tier 3 — Architectural / Lower Priority
 
