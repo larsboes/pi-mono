@@ -28,15 +28,20 @@
 
 ### 5. Swarm — Interactive Dialogue Testing
 
-**Status:** Partial (automated done, live testing open)
-**Priority:** Medium
-**Effort:** ~2h
+**Status:** Live-tested, mostly working
+**Priority:** Low (revisit when issues found)
+**Effort:** Done for now
 
-#### Open (requires live session)
-1. `/swarm quick <topic>` — parallel debate, ≥3 responses
-2. `/swarm begin` — editor → CEO → converse → end_deliberation → revert
-3. `/swarm stop` — mid-abort + session restore
-4. `/swarm run <yaml>` — DAG pipeline execution
+#### Tested
+- Extension loads and runs
+- `/swarm quick <topic>` — works
+- `/swarm begin` — works
+- Basic flow verified
+
+#### Still to verify
+- `/swarm stop` — mid-abort + session restore
+- `/swarm run <yaml>` — DAG pipeline execution
+- Edge cases under load
 
 ---
 
@@ -62,7 +67,7 @@
 | 16 | **Auto-Recall on Session Start** | OMP | 3-4h | ✅ Already implemented — cortex `before_agent_start` hook searches memory with prompt, injects top-3 reranked results. |
 | 17 | **Tree-Sitter Code Summarization** | OMP | 6-8h | `read` tool supports `summarize` mode — shows function/class/method signatures without bodies. Requires N-API native binding (tree-sitter). Massive context savings for large files. |
 | 18 | **Eval Framework (replace python via bash)** | OMP | 4-6h | Fenced `eval.py`/`eval.js` cells in sandboxed VM. Safer than raw bash for computation. |
-| 19 | **Read-Only Tool Parallelism** | Rust | 2-4h | Execute read-only tools (read, search, glob) in parallel instead of serializing. Free speedup on multi-tool turns. |
+| 19 | **Read-Only Tool Parallelism** | Rust | — | ✅ Already implemented — Agent core defaults to `toolExecution: "parallel"`. All tools run concurrently via `Promise.all` unless explicitly marked `executionMode: "sequential"`. |
 | 20 | **Background Compaction Worker** | Rust | 4-6h | Run LLM compaction off the foreground turn path with quota controls (cooldown, timeout, max_attempts). Smoother UX — no blocking compaction pauses. |
 
 ### Tier 3 — Architectural / Lower Priority
