@@ -16,11 +16,15 @@
 **Done:** 2026-05-06
 **Outcome:** All 6 sub-phases implemented and runtime-verified.
 
-Full 8-stage search pipeline:
-```
-Query → Retrieval → Intent (8.2) → Granularity (8.4) → Weights (8.2)
-      → Graph (8.3) → Context (8.5) → Personal (8.6) → Rerank (8.1)
-```
+### ~~2b. Cortex Phase 9 — Temporal Intelligence~~ ✅
+
+**Done:** 2026-05-06
+**Outcome:** Query expansion, temporal routing, multi-hop retrieval, weekly compaction.
+
+### ~~2c. Cortex Phase 10 — Intelligence Layer~~ ✅
+
+**Done:** 2026-05-06
+**Outcome:** Sub-sequence pattern mining, token-budgeted context injection, graph maintenance (decay + pruning).
 
 ### ~~6. Buddy Toggle~~ ✅
 
@@ -31,6 +35,11 @@ Query → Retrieval → Intent (8.2) → Granularity (8.4) → Weights (8.2)
 
 **Done:** 2026-05-06
 **Outcome:** Private extension was writing OAuth tokens to wrong config dir. Fixed `CONFIG_DIR` default to `.pi`.
+
+### ~~9. Ultra Modes Extension~~ ✅
+
+**Done:** 2026-05-06
+**Outcome:** Keyword-triggered cognitive modes (ULTRATHINK, ULTRAWIDE, ULTRAFOCUS, ULTRACARE) that boost thinking level + inject specialized reasoning prompts. Per-turn keywords + sticky `/ultra` command + `Ctrl+Shift+U` cycling.
 
 ---
 
@@ -61,20 +70,10 @@ cd ~/Developer/pi-ideas/oh-my-pi && git fetch origin && git log --oneline HEAD..
 
 ---
 
-### 4. Unified Stats (PAI Layer)
+### ~~4. Unified Stats (PAI Layer)~~ ✅
 
-**Status:** Planned
-**Priority:** Medium
-**Effort:** ~4h
-
-Add Claude Code session parsing to stats so `~/.pai/stats.db` covers all AI agent usage.
-
-#### Steps
-1. Add `src/parsers/claude-code.ts` to `extensions/stats/`
-2. Update `src/aggregator.ts` to call both parsers
-3. Change DB path from `~/.pi/stats.db` to `~/.pai/stats.db`
-4. Update `link-extensions.sh` if needed
-5. Dashboard: add source column to distinguish pi vs claude-code data
+**Done:** 2026-05-06 (was already implemented)
+**Outcome:** Both pi + Claude Code parsers working. 61.5k requests tracked in `~/.pai/stats.db`. Source breakdown, sparklines, and trend indicators added to `/stats` TUI + web dashboard SourceBreakdown component.
 
 ---
 
@@ -96,23 +95,10 @@ Add Claude Code session parsing to stats so `~/.pai/stats.db` covers all AI agen
 
 ---
 
-### 8. Extension Documentation
+### ~~8. Extension Documentation~~ ✅
 
-**Status:** Planned
-**Priority:** Low
-**Effort:** ~2h
-
-Several extensions lack READMEs:
-
-| Extension | README | Priority |
-|-----------|--------|----------|
-| cortex | ❌ | Medium — complex, needs docs |
-| pai | ❌ | Low |
-| stats | ❌ | Low |
-| swarm | ❌ | Medium |
-| buddy | ❌ | Low |
-
-Also: private extensions repo README needs real documentation.
+**Done:** 2026-05-06
+**Outcome:** READMEs added for cortex, pai, stats, swarm, buddy. Private repo README rewritten.
 
 ---
 
@@ -122,7 +108,7 @@ Also: private extensions repo README needs real documentation.
 
 | Extension | Version | LOC | Purpose |
 |-----------|---------|-----|---------|
-| cortex | 0.1.0 | 5,119 | Memory, retrieval, entity graph, feedback loop |
+| cortex | 0.1.0 | 6,557 | Memory, retrieval, entity graph, temporal intelligence, token budget |
 | web-access | 0.10.6 | 11,591 | Search, fetch, YouTube, PDF, GitHub |
 | mcp-adapter | 2.2.2 | 10,641 | MCP server gateway |
 | mitsupi | 1.0.0 | 10,970 | Personal extensions (statusline, etc.) |
@@ -131,6 +117,7 @@ Also: private extensions repo README needs real documentation.
 | swarm | 1.0.0 | 1,736 | Multi-agent YAML DAG orchestration |
 | pai | 1.0.0 | 823 | Skill discovery + HUD |
 | buddy | — | 742 | Virtual companion widget |
+| ultra | 1.0.0 | ~250 | ULTRA keyword-triggered deep thinking modes |
 
 ### Private (separate repo, symlinked)
 
