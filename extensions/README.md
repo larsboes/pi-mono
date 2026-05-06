@@ -20,6 +20,7 @@ Private extensions (work-specific providers and auth) live in a separate repo an
 | **pai** | PAI skill discovery + HUD statusline | (automatic) |
 | **buddy** | Virtual companion widget | `/buddy`, `/buddy toggle`, `/buddy reroll` |
 | **ultra** | Deep thinking keyword modes | `ULTRATHINK`, `ULTRAWIDE`, `/ultra` |
+| **image-ai** | Image generation + recognition | `generate_image`, `analyze_image` |
 
 ---
 
@@ -87,6 +88,15 @@ Keyword-triggered cognitive modes. Type at the start of a message:
 - `ULTRAFOCUS` — surgical precision
 - `ULTRACARE` — defensive/safety engineering
 
+### image-ai (~220 LOC)
+
+Image generation and recognition:
+- `generate_image` — Text-to-image via Cloudflare FLUX.1 Schnell (fast, cheap)
+- `analyze_image` — Image understanding via Gemini 2.5 Flash (vision)
+
+Requires: `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` and/or `GEMINI_API_KEY`.
+Only enables tools that have valid credentials.
+
 ---
 
 ## Setup
@@ -100,7 +110,7 @@ Extensions are symlinked from `~/.pi/agent/extensions/` → `pi-mono/extensions/
 
 Or manually:
 ```bash
-for ext in buddy cortex markdown-preview mcp-adapter mitsupi pai stats swarm ultra web-access; do
+for ext in buddy cortex image-ai markdown-preview mcp-adapter mitsupi pai stats swarm ultra web-access; do
   ln -sf "$(pwd)/extensions/$ext" ~/.pi/agent/extensions/
 done
 ```
@@ -111,7 +121,7 @@ done
 
 | Extension | Origin |
 |-----------|--------|
-| cortex, pai, buddy, ultra, swarm (deliberation) | Original work |
+| cortex, pai, buddy, ultra, image-ai, swarm (deliberation) | Original work |
 | mitsupi | Adapted from [mitsuhiko/agent-stuff](https://github.com/mitsuhiko/agent-stuff) |
 | swarm (DAG engine) | Ported from [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) |
 | stats | Ported from [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi), extended with Claude Code parser |

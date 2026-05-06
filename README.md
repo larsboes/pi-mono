@@ -25,7 +25,7 @@ Tools for building AI agents.
 
 ## Fork Extensions
 
-This fork adds 10 extensions in [`extensions/`](extensions/):
+This fork adds 11 extensions in [`extensions/`](extensions/):
 
 | Extension | Purpose |
 |-----------|--------|
@@ -39,6 +39,7 @@ This fork adds 10 extensions in [`extensions/`](extensions/):
 | **[pai](extensions/pai)** | PAI skill discovery + HUD statusline |
 | **[buddy](extensions/buddy)** | Virtual companion widget |
 | **[ultra](extensions/ultra)** | ULTRA keyword-triggered deep thinking modes |
+| **[image-ai](extensions/image-ai)** | Image generation (CF FLUX) + recognition (Gemini Flash) |
 
 See [`extensions/README.md`](extensions/README.md) for full details, setup, and attribution.
 

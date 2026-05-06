@@ -257,6 +257,8 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/
 - Vision backend selection should respect session context (e.g. security lanes)
 - Generation with non-sensitive prompts can always route to cheapest provider
 
+**Status:** ✅ MVP Done (2026-05-06) — `extensions/image-ai/` with CF FLUX generation + Gemini vision.
+
 **Effort:** 4-6h (MVP with CF FLUX generation + Gemini vision)
 
 ---
@@ -288,6 +290,7 @@ cd ~/Developer/pi-ideas/pi_agent_rust && git fetch origin && git log --oneline H
 | markdown-preview | 0.9.6 | 3,195 | Rendered MD + LaTeX preview |
 | stats | 1.1.0 | 1,773 | AI usage dashboard |
 | swarm | 1.0.0 | 1,736 | Multi-agent YAML DAG orchestration |
+| image-ai | 1.0.0 | ~220 | Image generation (CF FLUX) + recognition (Gemini Flash) |
 | pai | 1.0.0 | 823 | Skill discovery + HUD |
 | buddy | — | 742 | Virtual companion widget |
 | ultra | 1.0.0 | ~250 | ULTRA keyword-triggered deep thinking modes |
