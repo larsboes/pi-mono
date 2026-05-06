@@ -8,6 +8,9 @@ import * as memory from "./src/memory.js";
 import * as context from "./src/context.js";
 import { classifyIntent } from "./src/intent.js";
 import * as scratchpad from "./src/scratchpad.js";
+import * as correction from "./src/correction.js";
+import * as rules from "./src/rules.js";
+import * as feedback from "./src/feedback.js";
 import * as patterns from "./src/patterns.js";
 import * as crystallizer from "./src/crystallizer.js";
 import * as capabilities from "./src/capabilities.js";
@@ -26,6 +29,9 @@ import * as extensionCreator from "./src/extension-creator.js";
 export default function cortex(pi: ExtensionAPI) {
 	// Capture reload function from command context (available in commands but not tools)
 	let reloadFn: (() => Promise<void>) | null = null;
+
+	// Abort context cached between agent_end and the next user input event.
+	let lastAbortContext: import("./src/correction.js").AbortContext | null = null;
 
 	// ── Lifecycle Hooks ──────────────────────────────────────────────
 
@@ -49,17 +55,31 @@ export default function cortex(pi: ExtensionAPI) {
 		await session.initSession();
 	});
 
-	pi.on("before_agent_start", async (event, _ctx) => {
+	pi.on("before_agent_start", async (event, ctx) => {
 		// Phase 7+: Full context injection — hot context + semantic search + self-extension status
 		try {
 			const sessionCtx = session.getSessionContext();
 			const contextEntities = [...sessionCtx.files, ...sessionCtx.skills];
 			const intent = classifyIntent(event.prompt);
 			const [semanticResults, hotCtx, extensionStatus] = await Promise.all([
-				memory.search(event.prompt, 3, { intent, contextEntities: contextEntities.length > 0 ? contextEntities : undefined }),
+				// Phase 8.1: rerank on by default for the top-3 injected memories.
+				// Cold start ~3s (one-time model download), warm ~50ms — acceptable for
+				// the per-message hot path given the precision improvement.
+				memory.search(event.prompt, 3, {
+					intent,
+					rerank: true,
+					contextEntities: contextEntities.length > 0 ? contextEntities : undefined,
+				}),
 				context.loadHotContext(),
 				selfExtension.buildStatus(),
 			]);
+
+			// Phase 8.6: log injection-time retrieval as a (weak) interaction signal.
+			feedback.logInteraction(
+				event.prompt,
+				semanticResults.map((r) => r.source),
+				ctx.sessionManager.getSessionId(),
+			).catch(() => {});
 
 			const hotBlock = context.formatHotContext(hotCtx);
 
@@ -76,10 +96,18 @@ export default function cortex(pi: ExtensionAPI) {
 			// Self-extension status (only surfaces when there's something actionable)
 			const extensionBlock = selfExtension.formatStatus(extensionStatus);
 
-			if (!hotBlock && !semanticBlock && !extensionBlock) return {};
+			let correctionBlock = "";
+			try {
+				const block = await rules.buildInjectionBlock(ctx.cwd);
+				if (block) correctionBlock = `\n\n${block}`;
+			} catch (e) {
+				console.error(`[cortex] Correction-rules injection failed: ${(e as Error).message}`);
+			}
+
+			if (!hotBlock && !semanticBlock && !extensionBlock && !correctionBlock) return {};
 
 			return {
-				systemPrompt: event.systemPrompt + (hotBlock || "") + semanticBlock + extensionBlock,
+				systemPrompt: event.systemPrompt + (hotBlock || "") + semanticBlock + extensionBlock + correctionBlock,
 			};
 		} catch (e) {
 			console.error(`[cortex] Context injection failed: ${(e as Error).message}`);
@@ -127,6 +155,16 @@ export default function cortex(pi: ExtensionAPI) {
 					`[cortex] Session stats: ${sessionStats.activityCount} activities, ${sessionStats.filesTouched} files, ${sessionStats.duration}m`,
 				);
 			}
+
+			// Detect aborted turn for correction-learning. Cache for next input event to pair with user response.
+			try {
+				const abortCtx = correction.detectAbortedTurn(event.messages);
+				if (abortCtx) {
+					lastAbortContext = abortCtx;
+				}
+			} catch (e) {
+				console.error(`[cortex] Abort detection failed: ${(e as Error).message}`);
+			}
 		} catch (e) {
 			console.error(`[cortex] agent_end tracking failed: ${(e as Error).message}`);
 		}
@@ -144,30 +182,67 @@ export default function cortex(pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("session_before_switch", async (_event, _ctx) => {
+	pi.on("input", async (event, ctx) => {
+		if (!lastAbortContext) return { action: "continue" };
+		// "interactive" is the human-typed input source per InputSource = "interactive" | "rpc" | "extension".
+		if (event.source !== "interactive") return { action: "continue" };
+		try {
+			const sessionId = ctx.sessionManager.getSessionId();
+			const suggestion = correction.pairWithUserCorrection(
+				lastAbortContext,
+				event.text,
+				ctx.cwd,
+				sessionId,
+			);
+			if (suggestion) {
+				await correction.appendSuggestion(suggestion);
+				ctx.ui.notify(
+					`[cortex] Save this lesson? Type /learn <rule> to remember it next session.`,
+					"info",
+				);
+				if (lastAbortContext.referencedPaths.length > 0) {
+					try {
+						await feedback.recordCorrectionAsNegativeSignal(lastAbortContext.referencedPaths);
+					} catch (e) {
+						console.error(`[cortex] Negative-signal write failed: ${(e as Error).message}`);
+					}
+				}
+			}
+		} catch (e) {
+			console.error(`[cortex] input pairing failed: ${(e as Error).message}`);
+		} finally {
+			lastAbortContext = null;
+		}
+		return { action: "continue" };
+	});
+
+	pi.on("session_before_switch", async (_event, ctx) => {
 		// Flush session tracking before switching to new context
 		try {
 			const summary = await session.flushSession();
 			if (summary) {
 				console.log(`[cortex] Session flushed to daily log: ${summary.slice(0, 100)}...`);
+				if (ctx.hasUI) ctx.ui.notify(`※ Recap: ${summary}`, "info");
 			}
 		} catch (e) {
 			console.error(`[cortex] Session flush failed: ${(e as Error).message}`);
 		}
 	});
 
-	pi.on("session_shutdown", async (_event, _ctx) => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		// Flush session tracking on shutdown
 		try {
 			const summary = await session.flushSession();
 			if (summary) {
 				console.log(`[cortex] Session flushed to daily log: ${summary.slice(0, 100)}...`);
+				if (ctx.hasUI) ctx.ui.notify(`※ Recap: ${summary}`, "info");
 			} else {
 				console.log(`[cortex] Session shutdown: nothing to flush`);
 			}
 		} catch (e) {
 			console.error(`[cortex] Session flush failed: ${(e as Error).message}`);
 		}
+		lastAbortContext = null;
 	});
 
 	pi.on("resources_discover", async (_event, _ctx) => {
@@ -213,7 +288,7 @@ export default function cortex(pi: ExtensionAPI) {
 				Type.Literal("chunk"),
 			], { description: "Filter by chunk granularity: document (full file), section (heading), chunk (paragraph)" })),
 		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			try {
 				const intent = classifyIntent(params.query);
 				const sessionCtx = session.getSessionContext();
@@ -224,6 +299,13 @@ export default function cortex(pi: ExtensionAPI) {
 					granularity: params.granularity as "document" | "section" | "chunk" | undefined,
 					contextEntities: contextEntities.length > 0 ? contextEntities : undefined,
 				});
+				// Phase 8.6: log retrieval for personal-weight learning. Capped at top results
+				// inside feedback.logInteraction (TOP_K=3). Best-effort, never throws.
+				feedback.logInteraction(
+					params.query,
+					results.map((r) => r.source),
+					ctx.sessionManager.getSessionId(),
+				).catch(() => {});
 				if (results.length === 0) {
 					return {
 						content: [{ type: "text" as const, text: "No relevant memories found." }],
@@ -767,6 +849,83 @@ export default function cortex(pi: ExtensionAPI) {
 			}
 
 			ctx.ui.notify(text, "info");
+		},
+	});
+
+	pi.registerCommand("learn", {
+		description: "Save a correction-learning rule (use after the agent did the wrong thing)",
+		handler: async (args, ctx) => {
+			captureReload(ctx);
+			try {
+				const trimmed = (args ?? "").trim();
+				if (trimmed === "") {
+					emitCommandFeedback(
+						ctx,
+						"/learn <rule> | --global <rule> | list | forget <n> | forget --global <n>",
+						"info",
+					);
+					return;
+				}
+
+				const parts = trimmed.split(/\s+/);
+				const sub = parts[0];
+
+				if (sub === "list") {
+					const [globalRules, projectRules] = await Promise.all([
+						rules.listRules("global", ctx.cwd),
+						rules.listRules("project", ctx.cwd),
+					]);
+					const lines: string[] = [];
+					if (globalRules.length > 0) {
+						lines.push("Global rules:");
+						for (const r of globalRules) lines.push(`  ${r.index}. ${r.text}`);
+					}
+					if (projectRules.length > 0) {
+						if (lines.length > 0) lines.push("");
+						lines.push("Project rules:");
+						for (const r of projectRules) lines.push(`  ${r.index}. ${r.text}`);
+					}
+					emitCommandFeedback(ctx, lines.length > 0 ? lines.join("\n") : "(no rules saved)", "info");
+					return;
+				}
+
+				if (sub === "forget") {
+					let scope: rules.RuleScope = "project";
+					let idxArg = parts[1];
+					if (idxArg === "--global") {
+						scope = "global";
+						idxArg = parts[2];
+					}
+					const idx = idxArg ? parseInt(idxArg, 10) : NaN;
+					if (!Number.isInteger(idx)) {
+						emitCommandFeedback(ctx, "/learn forget <n> | forget --global <n>", "warning");
+						return;
+					}
+					const removed = await rules.removeRule(idx, scope, ctx.cwd);
+					if (!removed) {
+						emitCommandFeedback(ctx, `No rule at index ${idx} in ${scope} scope`, "warning");
+						return;
+					}
+					emitCommandFeedback(ctx, `Forgot ${scope} rule #${idx}: ${removed.text}`, "info");
+					return;
+				}
+
+				let scope: rules.RuleScope = "project";
+				let textParts = parts;
+				if (parts[0] === "--global") {
+					scope = "global";
+					textParts = parts.slice(1);
+				}
+				const text = textParts.join(" ").trim();
+				if (text.length === 0) {
+					emitCommandFeedback(ctx, "/learn <rule text>", "warning");
+					return;
+				}
+				await rules.addRule(text, scope, ctx.cwd);
+				emitCommandFeedback(ctx, `Saved ${scope} rule: ${text}`, "info");
+			} catch (e) {
+				emitCommandFeedback(ctx, `Learn error: ${(e as Error).message}`, "error");
+			}
 		},
 	});
 

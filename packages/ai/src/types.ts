@@ -232,6 +232,8 @@ export interface ToolResultMessage<TDetails = any> {
 	details?: TDetails;
 	isError: boolean;
 	timestamp: number; // Unix timestamp in milliseconds
+	/** When set, this tool result has been pruned to save context. The original output is no longer recoverable. */
+	prunedAt?: number;
 }
 
 export type Message = UserMessage | AssistantMessage | ToolResultMessage;

@@ -7,6 +7,8 @@ export interface SearchInteraction {
   results: string[];
   sessionId: string;
   timestamp: string;
+  /** True for correction-derived negative signals (decrement source counts). */
+  negative?: boolean;
 }
 
 export interface FeedbackStore {
@@ -24,6 +26,7 @@ const BOOST_THRESHOLD = 3;
 const BOOST_WEIGHT = 1.1;
 const DEFAULT_WEIGHT = 1.0;
 const MAX_SCORE = 1.0;
+const NEGATIVE_PENALTY = 0.85;
 
 async function loadStore(): Promise<FeedbackStore> {
   try {
@@ -87,15 +90,22 @@ export async function computePersonalWeights(): Promise<Record<string, number>> 
     for (const interaction of store.interactions) {
       if (!Array.isArray(interaction.results)) continue;
       const top = interaction.results.slice(0, TOP_K);
+      const isNegative = interaction.negative === true;
       for (const source of top) {
         if (typeof source !== "string" || source.length === 0) continue;
-        counts[source] = (counts[source] ?? 0) + 1;
+        counts[source] = (counts[source] ?? 0) + (isNegative ? -1 : 1);
       }
     }
 
     const weights: Record<string, number> = {};
     for (const [source, count] of Object.entries(counts)) {
-      weights[source] = count >= BOOST_THRESHOLD ? BOOST_WEIGHT : DEFAULT_WEIGHT;
+      if (count <= -BOOST_THRESHOLD) {
+        weights[source] = NEGATIVE_PENALTY;
+      } else if (count >= BOOST_THRESHOLD) {
+        weights[source] = BOOST_WEIGHT;
+      } else {
+        weights[source] = DEFAULT_WEIGHT;
+      }
     }
     weightsCache = { weights, expires: Date.now() + WEIGHTS_CACHE_TTL_MS };
     return weights;
@@ -115,4 +125,32 @@ export function applyPersonalWeights(
     const capped = adjusted > MAX_SCORE ? MAX_SCORE : adjusted;
     return { ...result, score: capped };
   });
+}
+
+/**
+ * Record a negative signal for a list of paths the agent referenced in an aborted turn.
+ * Stored as a SearchInteraction with `negative: true`, decrementing source counts
+ * during weight computation. Never throws.
+ */
+export async function recordCorrectionAsNegativeSignal(paths: string[]): Promise<void> {
+  if (!Array.isArray(paths) || paths.length === 0) return;
+  try {
+    const interaction: SearchInteraction = {
+      query: "<correction-negative-signal>",
+      results: [...paths].slice(0, TOP_K),
+      sessionId: "correction",
+      timestamp: new Date().toISOString(),
+      negative: true,
+    };
+
+    const store = await loadStore();
+    store.interactions.push(interaction);
+    if (store.interactions.length > MAX_INTERACTIONS) {
+      store.interactions = store.interactions.slice(store.interactions.length - MAX_INTERACTIONS);
+    }
+    await saveStore(store);
+    weightsCache = null;
+  } catch {
+    // never throw
+  }
 }

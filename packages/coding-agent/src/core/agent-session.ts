@@ -38,6 +38,8 @@ import {
 	estimateContextTokens,
 	generateBranchSummary,
 	prepareCompaction,
+	pruneToolOutputs,
+	resolveThresholdTokens,
 	shouldCompact,
 } from "./compaction/index.js";
 import { DEFAULT_THINKING_LEVEL } from "./defaults.js";
@@ -1828,6 +1830,16 @@ export class AgentSession {
 			contextTokens = calculateContextTokens(assistantMessage.usage);
 		}
 		if (shouldCompact(contextTokens, contextWindow, settings)) {
+			// Attempt cheap tool-output pruning first — if it saves enough to drop us
+			// back under the threshold, skip the model-driven compaction.
+			const pruneEntries = this.sessionManager.getBranch();
+			const prune = pruneToolOutputs(pruneEntries);
+			if (prune.prunedCount > 0) {
+				const after = estimateContextTokens(pruneEntries.flatMap((e) => (e.type === "message" ? [e.message] : [])));
+				if (after.tokens <= resolveThresholdTokens(contextWindow, settings)) {
+					return;
+				}
+			}
 			await this._runAutoCompaction("threshold", false);
 		}
 	}
