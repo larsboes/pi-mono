@@ -246,6 +246,12 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/
 - Image editing: Gemini supports conversational editing ("make it bluer") — worth exposing?
 - Should this be a standalone extension or part of the existing web-access extension?
 
+**Design Constraint: Provider-agnostic backend**
+- Extension must support configurable backends via settings (not hardcoded to one provider)
+- Private/corporate extensions can register alternative vision/generation backends
+- Vision backend selection should respect session context (e.g. security lanes)
+- Generation with non-sensitive prompts can always route to cheapest provider
+
 **Effort:** 4-6h (MVP with CF FLUX generation + Gemini vision)
 
 ---
