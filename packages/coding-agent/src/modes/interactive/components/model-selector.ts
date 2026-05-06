@@ -196,7 +196,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private computeCategories(): ModelCategory[] {
 		// When the user has a scope (enabledModels / --models), categories are derived
 		// from scoped providers — selecting an unscoped model bypasses gating extensions
-		// (like the tardis lane fence). "all" stays available as an escape hatch.
+		// (like a custom provider gate). "all" stays available as an escape hatch.
 		const hasScope = this.scopedModelItems.length > 0;
 		const sourceItems = hasScope ? this.scopedModelItems : this.allModels;
 		const providers = Array.from(new Set(sourceItems.map((m) => m.provider))).sort((a, b) => a.localeCompare(b));
@@ -231,7 +231,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 
 	private categoryLabel(category: ModelCategory): string {
 		// Use the provider name verbatim — providers are short, kebab-case identifiers
-		// (e.g. "amazon-bedrock", "tardis"). "all"/"scoped" stay lowercase to match.
+		// (e.g. "amazon-bedrock", "my-provider"). "all"/"scoped" stay lowercase to match.
 		return category;
 	}
 
