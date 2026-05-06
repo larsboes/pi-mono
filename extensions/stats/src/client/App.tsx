@@ -7,6 +7,7 @@ import { Header, RANGE_MS, type RangeKey } from "./components/Header";
 import { ModelsTable } from "./components/ModelsTable";
 import { RequestDetail } from "./components/RequestDetail";
 import { RequestList } from "./components/RequestList";
+import { SourceBreakdown } from "./components/SourceBreakdown";
 import { StatsGrid } from "./components/StatsGrid";
 import type { DashboardStats, MessageStats } from "./types";
 
@@ -76,6 +77,12 @@ export default function App() {
 				{activeTab === "overview" && (
 					<div className="space-y-6 animate-fade-in">
 						<StatsGrid stats={stats.overall} />
+
+						<SourceBreakdown
+							byModel={stats.byModel}
+							timeSeries={stats.timeSeries}
+							costSeries={stats.costSeries}
+						/>
 
 						<div className="grid lg:grid-cols-2 gap-6">
 							<RequestList

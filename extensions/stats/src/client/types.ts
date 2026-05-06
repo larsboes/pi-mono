@@ -62,6 +62,7 @@ export interface AggregatedStats {
 export interface ModelStats extends AggregatedStats {
 	model: string;
 	provider: string;
+	source?: string;
 }
 
 export interface FolderStats extends AggregatedStats {
