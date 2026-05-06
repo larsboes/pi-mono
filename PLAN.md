@@ -169,6 +169,87 @@ User Response
 
 ---
 
+#### 30. Image Intelligence Extension — Recognition + Generation
+
+**Concept:** A pi extension providing two tools (`analyze_image` + `generate_image`) backed by Cloudflare Workers AI (free tier) and Gemini (higher quality fallback).
+
+**Use Case 1: Image Recognition (`analyze_image`)**
+- Agent receives an image (pasted, file path, URL) and understands it
+- Applications: describe UI screenshots, read architecture diagrams, OCR text, analyze error screenshots, understand mockups
+- Backends (priority order):
+  1. Gemini 2.5 Flash (best quality vision, already have API key)
+  2. Cloudflare Llama 4 Scout 17B ($0.27/M input, multimodal, 131k context)
+  3. Cloudflare Llama 3.2 11B Vision (free tier fallback)
+
+**Use Case 2: Image Generation (`generate_image`)**
+- Agent generates images from text descriptions
+- Applications: placeholder images, concept visualization, diagrams, mockup generation, social media assets
+- Backends (priority order):
+  1. Cloudflare FLUX.1 Schnell ($0.000053/tile — essentially free, fast)
+  2. Cloudflare FLUX 2 Klein ($0.015/image — higher quality)
+  3. Gemini 2.5 Flash Image / gemini-3-pro-image-preview (best quality, conversational editing)
+
+**Architecture:**
+```
+pi extension (analyze_image / generate_image tools)
+    ├── Direct Gemini API calls (GEMINI_API_KEY)
+    └── Cloudflare Workers AI REST API (CF_ACCOUNT_ID + CF_API_TOKEN)
+        └── Optional: CF Worker proxy for caching + rate limiting
+```
+
+**Implementation Plan:**
+1. Create `extensions/image-ai/` extension
+2. Register `analyze_image` tool:
+   - Accept image (base64 from paste, file path, or URL)
+   - Send to Gemini with user's question about the image
+   - Fallback to CF Llama 4 Scout if no Gemini key
+3. Register `generate_image` tool:
+   - Accept text prompt + optional size/style params
+   - Call CF FLUX.1 Schnell REST API
+   - Save generated PNG to temp file, display in terminal (iTerm2/Kitty protocol)
+   - Optional: Gemini Flash Image for conversational editing
+4. Optional: Deploy CF Worker proxy for:
+   - API key management (don't expose in extension)
+   - Response caching (same prompt → cached image)
+   - Usage tracking / budget caps
+
+**Cloudflare Workers AI REST API:**
+```bash
+# Image generation
+curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell \
+  -H "Authorization: Bearer {token}" \
+  -d '{"prompt": "a cat astronaut"}'
+# Returns: binary PNG
+
+# Vision (Llama 4 Scout)
+curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama-4-scout-17b-16e-instruct \
+  -H "Authorization: Bearer {token}" \
+  -d '{"messages": [{"role": "user", "content": [{"type": "text", "text": "Describe this image"}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}]}]}'
+```
+
+**Gemini Image Generation:**
+```python
+# responseModalities: ["TEXT", "IMAGE"]
+# model: gemini-2.5-flash-image
+# Returns inline base64 image in response parts
+```
+
+**Pricing (monthly estimate for moderate use):**
+- CF free tier: 10,000 neurons/day (~100 FLUX images or ~50 Llama 4 vision calls)
+- Gemini Flash vision: ~$0.01 per image analysis
+- Gemini Flash image gen: ~$0.003 per generated image (1290 tokens)
+- Total for 500 uses/month: ~$2-5
+
+**Open Questions:**
+- Display strategy: iTerm2 inline images? Or save to file + open?
+- Should generated images auto-attach to the conversation context?
+- Image editing: Gemini supports conversational editing ("make it bluer") — worth exposing?
+- Should this be a standalone extension or part of the existing web-access extension?
+
+**Effort:** 4-6h (MVP with CF FLUX generation + Gemini vision)
+
+---
+
 ### Monitoring (check monthly)
 
 | Source | What to Watch |
