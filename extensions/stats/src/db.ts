@@ -347,6 +347,51 @@ function rowToMessageStats(row: Record<string, unknown>): MessageStats {
 	};
 }
 
+export interface SessionSummaryRow {
+	sessionFile: string;
+	folder: string;
+	source: string;
+	totalRequests: number;
+	totalCost: number;
+	totalInputTokens: number;
+	totalOutputTokens: number;
+	firstTimestamp: number;
+	lastTimestamp: number;
+	models: string;
+}
+
+export function getSessionsSummary(sinceTs?: number, limit = 30): SessionSummaryRow[] {
+	if (!db) return [];
+	const where = sinceTs ? "WHERE timestamp >= ?" : "";
+	const params: unknown[] = sinceTs ? [sinceTs] : [];
+	params.push(limit);
+	return (db.prepare(`
+		SELECT session_file, folder, source,
+			COUNT(*) as total_requests,
+			SUM(cost_total) as total_cost,
+			SUM(input_tokens) as total_input_tokens,
+			SUM(output_tokens) as total_output_tokens,
+			MIN(timestamp) as first_timestamp,
+			MAX(timestamp) as last_timestamp,
+			GROUP_CONCAT(DISTINCT model) as models
+		FROM messages ${where}
+		GROUP BY session_file
+		ORDER BY last_timestamp DESC
+		LIMIT ?
+	`).all(...params) as any[]).map(r => ({
+		sessionFile: r.session_file,
+		folder: r.folder,
+		source: r.source,
+		totalRequests: r.total_requests,
+		totalCost: r.total_cost,
+		totalInputTokens: r.total_input_tokens,
+		totalOutputTokens: r.total_output_tokens,
+		firstTimestamp: r.first_timestamp,
+		lastTimestamp: r.last_timestamp,
+		models: r.models,
+	}));
+}
+
 export function closeDb(): void {
 	db?.close();
 	db = null;

@@ -1,0 +1,22 @@
+{
+  "name": "@larsboes/pi-ultra",
+  "version": "1.0.0",
+  "description": "ULTRA modes — keyword-triggered deep thinking, divergent exploration, surgical precision, and defensive coding",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-ai": "file:../../packages/ai",
+    "@mariozechner/pi-coding-agent": "file:../../packages/coding-agent",
+    "@mariozechner/pi-tui": "file:../../packages/tui",
+    "typescript": "^5.7.0"
+  }
+}

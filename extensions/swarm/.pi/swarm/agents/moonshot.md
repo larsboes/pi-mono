@@ -1,7 +1,7 @@
 ---
 name: Moonshot
 description: "Big-bet thinker — 10x moves, category-defining plays, what if we're thinking too small"
-model: anthropic/claude-sonnet-4-20250514
+model: google/gemini-2.5-pro
 color: "#72f1b8"
 ---
 

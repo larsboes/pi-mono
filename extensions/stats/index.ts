@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { getDashboardStats, getTotalMessageCount, syncAllSessions } from "./src/aggregator";
+import { getDashboardStats, getTotalMessageCount, listSessions, syncAllSessions } from "./src/aggregator";
 import { startServer } from "./src/server";
 import { parseSinceSpec } from "./src/cli";
 
@@ -20,6 +20,7 @@ type CommandCtx = {
 const USAGE = [
 	"/stats                       → overall summary (all time)",
 	"/stats 7d | 30d | 90d | 24h  → summary for a time window",
+	"/stats sessions [<since>]    → list recent sessions with topics",
 	"/stats models [<since>]      → per-model breakdown",
 	"/stats folders [<since>]     → per-project breakdown",
 	"/stats dashboard [port]      → launch HTTP dashboard (default :3847)",
@@ -123,6 +124,34 @@ export default function statsExtension(pi: ExtensionAPI): void {
 
 				// Remaining variants all produce a summary, differing only by scope + window.
 				await syncAllSessions();
+
+				// /stats sessions [<since>]
+				if (first === "sessions") {
+					const sinceTs = parseSinceSpec(rest[0]);
+					const sessions = await listSessions(sinceTs, 20);
+					if (sessions.length === 0) {
+						notify(ctx, "No sessions found.");
+						return;
+					}
+					const windowLabel = rest[0] && rest[0] !== "all" ? `last ${rest[0]}` : "recent";
+					const lines = [`Sessions (${windowLabel}):\n`];
+					for (const s of sessions) {
+						const time = new Date(s.startedAt).toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+						const badge = s.source === "claude-code" ? "CC" : "pi";
+						const dur = s.durationMin > 0 ? `${s.durationMin}m` : "<1m";
+						const cost = s.cost < 0.01 ? "<$0.01" : `$${s.cost.toFixed(2)}`;
+						const shortId = s.id.slice(0, 8);
+						const topic = s.firstUserMessage ? s.firstUserMessage.slice(0, 70) : "(no user message)";
+						const model = s.models[0]?.replace(/^eu\.anthropic\.|^anthropic\.|\-v\d+$/g, "").slice(0, 20) ?? "?";
+						lines.push(`  [${badge}] ${time} │ ${dur} │ ${s.requests} reqs │ ${cost} │ ${model}`);
+						lines.push(`        ${shortId}  ${topic}`);
+						lines.push(`        ${s.folder}`);
+						lines.push("");
+					}
+					lines.push(`Resume: pi --session <id> (use first 8 chars shown above)`);
+					notify(ctx, lines.join("\n"));
+					return;
+				}
 
 				// /stats models [<since>]  or  /stats folders [<since>]  or  /stats <since>
 				let scope: "overall" | "models" | "folders" = "overall";

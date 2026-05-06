@@ -16,6 +16,7 @@ Both are parsed incrementally (offset-tracked) and stored in `~/.pai/stats.db` (
 ```
 /stats                       → overall summary with sparklines + source breakdown
 /stats 7d | 30d | 90d | 24h → summary for a time window
+/stats sessions [<since>]    → list recent sessions with topics + resume IDs
 /stats models [<since>]      → per-model breakdown
 /stats folders [<since>]     → per-project breakdown
 /stats dashboard [port]      → launch web dashboard (default :3847)

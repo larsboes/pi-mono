@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Api, Context, Model, UserMessage } from "@mariozechner/pi-ai";
 import { complete } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -31,11 +33,12 @@ export interface DialogueOptions {
 	signal?: AbortSignal;
 	ctx: ExecutionContext;
 	stateTracker: StateTracker;
+	expertiseDir?: string;
 	onRound?: (round: number, responses: MemberResponse[]) => void;
 }
 
 export async function executeDialogue(options: DialogueOptions): Promise<DialogueResult> {
-	const { agents, maxRounds, briefContent, modelOverride, signal, ctx, stateTracker, onRound } = options;
+	const { agents, maxRounds, briefContent, modelOverride, signal, ctx, stateTracker, expertiseDir, onRound } = options;
 	const transcript: TranscriptEntry[] = [];
 	let totalCost = 0, totalInput = 0, totalOutput = 0;
 
@@ -48,7 +51,7 @@ export async function executeDialogue(options: DialogueOptions): Promise<Dialogu
 		const roundResponses: MemberResponse[] = [];
 
 		const results = await Promise.allSettled(
-			agents.map(agent => callAgent(agent, round, conversationContext, briefContent, modelOverride, ctx, signal)),
+			agents.map(agent => callAgent(agent, round, conversationContext, briefContent, modelOverride, ctx, signal, expertiseDir)),
 		);
 
 		for (let i = 0; i < agents.length; i++) {
@@ -82,12 +85,13 @@ export async function quickRound(
 	modelOverride: string | undefined,
 	ctx: ExecutionContext,
 	signal?: AbortSignal,
+	expertiseDir?: string,
 ): Promise<{ responses: MemberResponse[]; totalCost: number }> {
 	const responses: MemberResponse[] = [];
 	let totalCost = 0;
 
 	const results = await Promise.allSettled(
-		agents.map(agent => callAgent(agent, 1, "", topic, modelOverride, ctx, signal)),
+		agents.map(agent => callAgent(agent, 1, "", topic, modelOverride, ctx, signal, expertiseDir)),
 	);
 
 	for (const result of results) {
@@ -108,12 +112,28 @@ async function callAgent(
 	modelOverride: string | undefined,
 	ctx: ExecutionContext,
 	signal?: AbortSignal,
+	expertiseDir?: string,
 ): Promise<MemberResponse> {
 	const piCtx = ctx.piCtx;
 	const model = resolveModel(piCtx, modelOverride ?? agent.model);
 
 	const systemParts = [`You are ${agent.role}.`];
 	if (agent.extraContext) systemParts.push(agent.extraContext);
+
+	// Inject accumulated expertise from past deliberations
+	if (expertiseDir) {
+		const slug = agent.name.toLowerCase().replace(/\s+/g, "-");
+		const expertisePath = path.join(expertiseDir, `${slug}.md`);
+		if (fs.existsSync(expertisePath)) {
+			const content = fs.readFileSync(expertisePath, "utf-8");
+			// Get last 5 entries (separated by ---)
+			const entries = content.split(/\n---\n/).filter(e => e.trim() && !e.startsWith("# "));
+			const recent = entries.slice(-5).join("\n---\n");
+			if (recent.trim()) {
+				systemParts.push(`\n## Your Accumulated Insights (from past deliberations)\n\n${recent}`);
+			}
+		}
+	}
 
 	let userPrompt = "";
 	if (briefContent && round === 1) userPrompt += `## Brief\n\n${briefContent}\n\n`;

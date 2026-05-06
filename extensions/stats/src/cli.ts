@@ -2,7 +2,7 @@
 
 import { parseArgs } from "node:util";
 import { closeDb } from "./db";
-import { getDashboardStats, getTotalMessageCount, syncAllSessions } from "./aggregator";
+import { getDashboardStats, getTotalMessageCount, listSessions, syncAllSessions } from "./aggregator";
 import { startServer } from "./server";
 
 function fmt(n: number, decimals = 0): string {
@@ -100,6 +100,36 @@ Dashboard: http://localhost:3847
 			.map(([src, n]) => `${src}:${n}`)
 			.join(" ");
 		console.log(`Synced ${processed} new entries from ${files} files (${total} total)${sourceSummary ? ` [${sourceSummary}]` : ""}\n`);
+
+		// Check for positional "sessions" argument
+		const positionals = process.argv.slice(2).filter(a => !a.startsWith("-"));
+		if (positionals[0] === "sessions") {
+			const sinceSpec = positionals[1];
+			const since = parseSinceSpec(sinceSpec);
+			const sessions = await listSessions(since, 20);
+			if (sessions.length === 0) {
+				console.log("No sessions found.");
+			} else {
+				const windowLabel = sinceSpec && sinceSpec !== "all" ? `last ${sinceSpec}` : "recent";
+				console.log(`Sessions (${windowLabel}):\n`);
+				for (const s of sessions) {
+					const time = new Date(s.startedAt).toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+					const badge = s.source === "claude-code" ? "CC" : "pi";
+					const dur = s.durationMin > 0 ? `${s.durationMin}m` : "<1m";
+					const cost = s.cost < 0.01 ? "<$0.01" : `$${s.cost.toFixed(2)}`;
+					const shortId = s.id.slice(0, 8);
+					const topic = s.firstUserMessage ? s.firstUserMessage.slice(0, 70) : "(no user message)";
+					const model = s.models[0]?.replace(/^eu\.anthropic\.|^anthropic\.|\-v\d+$/g, "").slice(0, 20) ?? "?";
+					console.log(`  [${badge}] ${time} │ ${dur} │ ${s.requests} reqs │ ${cost} │ ${model}`);
+					console.log(`        ${shortId}  ${topic}`);
+					console.log(`        ${s.folder}`);
+					console.log("");
+				}
+				console.log(`Resume: pi --session <id>`);
+			}
+			closeDb();
+			return;
+		}
 
 		if (values.json) {
 			console.log(JSON.stringify(await getDashboardStats(sinceTs), null, 2));

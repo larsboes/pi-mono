@@ -458,7 +458,7 @@ function buildWidget(ctx: ExtensionContext): string[] {
 	const lines: string[] = [];
 	const paiBrand = `${paiP("P")}${paiA("A")}${paiI("I")}`;
 
-	// Line 1: Header + lane + time + weather
+	// Line 1: Header + lane + session + time + weather
 	const time = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 	const weather = cachedWeather || "";
 	const lane = getMemoryLane();
@@ -468,7 +468,9 @@ function buildWidget(ctx: ExtensionContext): string[] {
 		const label = lane.label ?? lane.lane.toUpperCase();
 		return lane.restricted ? rose(`${icon} ${label}`) : emerald(`${icon} ${label}`);
 	})();
-	const headerRight = [lanePill, paiA(time)];
+	const sessionId = ctx.sessionManager.getSessionId();
+	const shortId = sessionId ? slate500(`⊞ ${sessionId.slice(0, 8)}`) : "";
+	const headerRight = [lanePill, shortId, paiA(time)].filter(Boolean);
 	if (weather) headerRight.push(weatherBlue(weather));
 	lines.push(
 		`${slate600("── │")} ${paiBrand} ${paiA("STATUSLINE")} ${slate600("│")} ${headerRight.join(` ${SEP} `)} ${slate600("─────────────────────────────")}`
@@ -614,6 +616,16 @@ export default function pai(pi: ExtensionAPI) {
 
 	pi.on("model_select", async (_event, ctx) => {
 		refresh(ctx);
+	});
+
+	// Print session ID on quit so the user can resume with `pi --session <id>`
+	pi.on("session_shutdown", async (event, ctx) => {
+		if (event.reason === "quit") {
+			const id = ctx.sessionManager.getSessionId();
+			const name = ctx.sessionManager.getSessionName?.();
+			const label = name ? `${name} (${id.slice(0, 8)})` : id.slice(0, 8);
+			console.error(`\x1b[2mSession: ${label} — resume with: pi -c\x1b[0m`);
+		}
 	});
 
 	// Inject TELOS from the vault into the system prompt on every agent turn.

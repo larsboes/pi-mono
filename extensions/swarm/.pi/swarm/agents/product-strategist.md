@@ -1,7 +1,7 @@
 ---
 name: Product Strategist
 description: "User value, competitive positioning, time-to-value, and compounding product advantage"
-model: anthropic/claude-sonnet-4-20250514
+model: google/gemini-2.5-pro
 color: "#fede5d"
 ---
 
