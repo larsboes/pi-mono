@@ -2,54 +2,34 @@
 
 ---
 
-## 1. pi_agent_rust — Conformance Validation
+## ~~1. pi_agent_rust — Conformance Validation~~ ✅ Done
 
 **Status:** Done (2026-04-30)
-**Outcome:** Hold migration. Blockers: (1) wasmtime 41.0.4 has 11 CVEs incl. 1 CVSS 9 critical sandbox escape (upstream fix needs wasmtime ≥42.0.2); (2) custom provider registration path unverified end-to-end. mitsupi's `node:net` usage turned out to be a false positive — it's Unix domain IPC for inter-session control, not TCP. No refactor needed. Re-check upstream monthly via `cargo audit`.
-**Priority:** High (evaluate before next upstream merge cycle)
-**Effort:** Standard (~2h)
-**Reference:** `~/Developer/pi-ideas/pi_agent_rust/`
-
-### Problem
-
-pi_agent_rust is a Rust rewrite of the pi agent claiming 5x faster startup, 12x less memory, 83.9% extension compatibility. We need to know if OUR extensions work before considering a switch.
-
-### Goal
-
-Run our 9 public extensions against pi_agent_rust's conformance harness and identify what breaks.
-
-### Steps
-
-1. Build pi_agent_rust from source (`cargo build --release`)
-2. Run built-in conformance test suite to verify baseline passes
-3. Test each extension individually:
-   - `cortex` — most complex, uses ONNX embeddings + filesystem writes
-   - `pai` — reads PAI skill sources, renders statusline
-   - `swarm` — uses `complete()` from pi-ai, registers tools dynamically
-   - `mitsupi` — multi-file, uses pi-tui components
-   - `stats` — standalone Bun CLI, NOT loaded by extension runner (skip)
-   - `mcp-adapter` — complex, MCP server lifecycle management
-   - `web-access` — external API calls (Exa, Perplexity, Gemini)
-   - `markdown-preview` — terminal rendering, image protocols
-   - `buddy` — sprite rendering, display utils
-4. For each failure: identify if it's a missing npm stub, API gap, or fundamental incompatibility
-5. Document results in `add-docs/pi-agent-rust-conformance.md`
-
-### Decision Point
-
-If ≥8/9 extensions pass (stats excluded): plan migration timeline.
-If <8 pass: file issues upstream, re-evaluate in 1 month.
-
-### Migration Path (if conformance passes)
-
-1. Update `dotfiles/shell/02-aliases.sh` — `alias pi=` points to rust binary
-2. Update `add-docs/architecture.md` — document rust runtime
-3. Keep Node/Bun build for extension development (TypeScript tooling)
-4. Keep `pi-rebuild` alias for extension development builds
+**Outcome:** Hold migration. Blockers: wasmtime CVEs. Re-check monthly.
 
 ---
 
-## 2. oh-my-pi Feature Mining — Remaining Candidates
+## ~~2. Cortex Phase 8 — Retrieval Quality Pipeline~~ ✅ Done
+
+**Status:** Done (2026-05-06)
+**Outcome:** All 6 sub-phases implemented and runtime-verified.
+
+Full 8-stage search pipeline:
+```
+Query → Retrieval → Intent (8.2) → Granularity (8.4) → Weights (8.2)
+      → Graph (8.3) → Context (8.5) → Personal (8.6) → Rerank (8.1)
+```
+
+Runtime test results:
+- 6/6 intent classifications correct
+- Entity graph: extraction, persistence, traversal all working
+- Feedback: logging, weight computation, negative signals all working
+- Session context: recency-ordered entities, density tracking
+- Full search: intents route correctly, granularity filters apply
+
+---
+
+## 3. oh-my-pi Feature Mining — Remaining Candidates
 
 **Status:** Planned (low priority)
 **Priority:** Low
@@ -80,7 +60,7 @@ No active fork relationship — just periodic reference pulls.
 
 ---
 
-## 3. Unified Stats (PAI Layer)
+## 4. Unified Stats (PAI Layer)
 
 **Status:** Planned
 **Priority:** Medium
@@ -98,7 +78,7 @@ Add Claude Code session parsing to stats so `~/.pai/stats.db` covers all AI agen
 
 ---
 
-## 4. Swarm — Interactive Dialogue Testing
+## 5. Swarm — Interactive Dialogue Testing
 
 **Status:** Partial — static validated, manual checklist ready (2026-04-30)
 **Priority:** Medium
