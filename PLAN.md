@@ -48,18 +48,18 @@
 
 | # | Feature | Source | Effort | Description |
 |---|---------|--------|--------|-------------|
-| 10 | **Workspace Tree in System Prompt** | OMP | 2-3h | Inject `<workspace-tree>` depth-3, 120-line-capped dir listing into system prompt. Agent orients instantly without `ls` calls. |
-| 11 | **`/retry` Slash Command** | OMP | 30min | Manually re-run the last model turn. Trivial to implement. |
+| 10 | **Workspace Tree in System Prompt** | OMP | 2-3h | ✅ Done — Inject `<workspace-tree>` depth-3, 120-line-capped dir listing into system prompt. Agent orients instantly without `ls` calls. |
+| 11 | **`/retry` Slash Command** | OMP | 30min | ✅ Done — Manually re-run the last model turn. |
 | 12 | ~~**Auto-Retry on Network Errors**~~ | OMP | — | **Already implemented** in agent-session.ts (`_isRetryableError` + `_handleRetryableError` with exponential backoff). |
-| 13 | **Editor Draft Persistence** | OMP | 1h | Save unsent editor text on Ctrl+D/shutdown, restore on resume. Never lose typed drafts. |
-| 14 | **Error Hints System** | Rust | 2-3h | Map common error variants → actionable remediation (commands, env vars, paths). e.g. "Missing API key" → "Set ANTHROPIC_API_KEY or add to config.yml". |
+| 13 | **Editor Draft Persistence** | OMP | 1h | ✅ Done — Save unsent editor text on Ctrl+D/shutdown, restore on resume. |
+| 14 | **Error Hints System** | Rust | 2-3h | ✅ Done — 14 pattern matchers → actionable remediation hints. |
 
 ### Tier 2 — High-Value Features (4-8h each)
 
 | # | Feature | Source | Effort | Description |
 |---|---------|--------|--------|-------------|
-| 15 | **Tool Discovery (BM25 Search)** | OMP | 4-6h | Build BM25 index over all tools (builtin + MCP + extension). Agent calls `search_tool_bm25("kubernetes pod")` to discover and activate tools dynamically. Huge unlock for MCP-heavy workflows. |
-| 16 | **Auto-Recall on Session Start** | OMP | 3-4h | On first turn, query cortex memory with session CWD + initial prompt → inject relevant past context. OMP calls this "hindsight first-turn recall". Our cortex extension already has the retrieval pipeline. |
+| 15 | **Tool Discovery (BM25 Search)** | OMP | 4-6h | ✅ Done — BM25 index over all tools with `search_tools` builtin. Field weights: name:6, desc:3, params:1. |
+| 16 | **Auto-Recall on Session Start** | OMP | 3-4h | ✅ Already implemented — cortex `before_agent_start` hook searches memory with prompt, injects top-3 reranked results. |
 | 17 | **Tree-Sitter Code Summarization** | OMP | 6-8h | `read` tool supports `summarize` mode — shows function/class/method signatures without bodies. Requires N-API native binding (tree-sitter). Massive context savings for large files. |
 | 18 | **Eval Framework (replace python via bash)** | OMP | 4-6h | Fenced `eval.py`/`eval.js` cells in sandboxed VM. Safer than raw bash for computation. |
 | 19 | **Read-Only Tool Parallelism** | Rust | 2-4h | Execute read-only tools (read, search, glob) in parallel instead of serializing. Free speedup on multi-tool turns. |
