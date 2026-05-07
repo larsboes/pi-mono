@@ -18,6 +18,7 @@ import { registerAlgorithm, getAlgoState } from "./algorithm.js";
 import { registerISA, buildISAContext } from "./isa.js";
 import { registerSessionLearning } from "./session-learning.js";
 import { registerSecurityGuard } from "./security.js";
+import { registerDream, shouldAutoDream } from "./dream.js";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -602,6 +603,9 @@ export default function pai(pi: ExtensionAPI) {
 
 	// PAI Security — block dangerous bash commands
 	registerSecurityGuard(pi);
+
+	// PAI Dream — periodic self-improvement from execution analysis
+	registerDream(pi);
 
 	// PAI Statusline — HUD widget + footer status
 	pi.on("session_start", async (event, ctx) => {
