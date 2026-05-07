@@ -9,8 +9,8 @@
  *
  * Ported from oh-my-pi (packages/coding-agent/src/session/compaction/pruning.ts).
  */
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import type { SessionEntry, SessionMessageEntry } from "../session-manager.js";
 import { estimateTokens } from "./compaction.js";
 

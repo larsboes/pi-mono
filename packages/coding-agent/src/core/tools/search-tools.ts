@@ -6,7 +6,7 @@
  * doesn't know which one to use.
  */
 
-import type { AgentToolResult, AgentToolUpdateCallback } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult, AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
 import { type Static, Type } from "typebox";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.js";
 import { buildToolSearchIndex, type DiscoverableTool, searchTools, type ToolSearchIndex } from "../tool-discovery.js";
