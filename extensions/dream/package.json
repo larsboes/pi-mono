@@ -1,0 +1,11 @@
+{
+	"name": "@mariozechner/pi-dream",
+	"version": "1.0.0",
+	"description": "Autonomous self-improvement — reviews past sessions to propose skills, extensions, and config improvements",
+	"type": "module",
+	"main": "./index.ts",
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"typebox": "*"
+	}
+}

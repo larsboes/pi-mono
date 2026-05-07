@@ -25,6 +25,7 @@ import {
 	createCompactionSummaryMessage,
 	createCustomMessage,
 } from "./messages.js";
+import { type IndexedSession, SessionIndex } from "./session-index.js";
 
 export const CURRENT_SESSION_VERSION = 3;
 
@@ -619,7 +620,34 @@ async function buildSessionInfo(filePath: string): Promise<SessionInfo | null> {
 
 export type SessionListProgress = (loaded: number, total: number) => void;
 
-async function listSessionsFromDir(
+// ── Session Index Integration ────────────────────────────────────────────────
+
+let _sessionIndex: SessionIndex | null = null;
+
+function getSessionIndex(): SessionIndex {
+	if (!_sessionIndex) {
+		_sessionIndex = new SessionIndex(getSessionsDir());
+	}
+	return _sessionIndex;
+}
+
+function indexedToSessionInfo(indexed: IndexedSession): SessionInfo {
+	return {
+		path: indexed.filePath,
+		id: indexed.id,
+		cwd: indexed.cwd,
+		name: indexed.name,
+		parentSessionPath: indexed.parentSessionPath,
+		created: new Date(indexed.created),
+		modified: new Date(indexed.modifiedMs),
+		messageCount: indexed.messageCount,
+		firstMessage: indexed.firstMessage,
+		allMessagesText: indexed.allMessagesText,
+	};
+}
+
+/** @deprecated Kept as fallback. Index-based listing is now preferred. */
+async function _listSessionsFromDir(
 	dir: string,
 	onProgress?: SessionListProgress,
 	progressOffset = 0,
@@ -851,6 +879,22 @@ export class SessionManager {
 		} else {
 			appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\n`);
 		}
+
+		// Schedule async index update (debounced, non-blocking)
+		this._scheduleIndexUpdate();
+	}
+
+	private _indexUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+	private _scheduleIndexUpdate(): void {
+		if (this._indexUpdateTimer) return; // Already scheduled
+		this._indexUpdateTimer = setTimeout(() => {
+			this._indexUpdateTimer = null;
+			if (this.sessionFile) {
+				getSessionIndex()
+					.update(this.sessionFile)
+					.catch(() => {});
+			}
+		}, 2000); // Update index 2s after last write (batches rapid writes)
 	}
 
 	private _appendEntry(entry: SessionEntry): void {
@@ -1399,9 +1443,9 @@ export class SessionManager {
 	 */
 	static async list(cwd: string, sessionDir?: string, onProgress?: SessionListProgress): Promise<SessionInfo[]> {
 		const dir = sessionDir ?? getDefaultSessionDir(cwd);
-		const sessions = await listSessionsFromDir(dir, onProgress);
-		sessions.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-		return sessions;
+		const index = getSessionIndex();
+		const indexed = await index.listForDir(dir, onProgress);
+		return indexed.map(indexedToSessionInfo);
 	}
 
 	/**
@@ -1410,51 +1454,8 @@ export class SessionManager {
 	 */
 	static async listAll(onProgress?: SessionListProgress): Promise<SessionInfo[]> {
 		const sessionsDir = getSessionsDir();
-
-		try {
-			if (!existsSync(sessionsDir)) {
-				return [];
-			}
-			const entries = await readdir(sessionsDir, { withFileTypes: true });
-			const dirs = entries.filter((e) => e.isDirectory()).map((e) => join(sessionsDir, e.name));
-
-			// Count total files first for accurate progress
-			let totalFiles = 0;
-			const dirFiles: string[][] = [];
-			for (const dir of dirs) {
-				try {
-					const files = (await readdir(dir)).filter((f) => f.endsWith(".jsonl"));
-					dirFiles.push(files.map((f) => join(dir, f)));
-					totalFiles += files.length;
-				} catch {
-					dirFiles.push([]);
-				}
-			}
-
-			// Process all files with progress tracking
-			let loaded = 0;
-			const sessions: SessionInfo[] = [];
-			const allFiles = dirFiles.flat();
-
-			const results = await Promise.all(
-				allFiles.map(async (file) => {
-					const info = await buildSessionInfo(file);
-					loaded++;
-					onProgress?.(loaded, totalFiles);
-					return info;
-				}),
-			);
-
-			for (const info of results) {
-				if (info) {
-					sessions.push(info);
-				}
-			}
-
-			sessions.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-			return sessions;
-		} catch {
-			return [];
-		}
+		const index = getSessionIndex();
+		const indexed = await index.listAll(sessionsDir, onProgress);
+		return indexed.map(indexedToSessionInfo);
 	}
 }

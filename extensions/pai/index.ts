@@ -14,6 +14,10 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { registerSkills } from "./skills.js";
+import { registerAlgorithm, getAlgoState } from "./algorithm.js";
+import { registerISA, buildISAContext } from "./isa.js";
+import { registerSessionLearning } from "./session-learning.js";
+import { registerSecurityGuard } from "./security.js";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -231,14 +235,7 @@ function getPaiVersion(): string {
 	}
 }
 
-function getAlgoVersion(): string {
-	try {
-		const settings = JSON.parse(readFileSync(CC_SETTINGS, "utf-8"));
-		return settings?.pai?.algorithmVersion || "—";
-	} catch {
-		return "—";
-	}
-}
+
 
 interface MemoryLaneInfo {
 	lane: string;           // e.g. "external", "internal", or any custom name
@@ -476,14 +473,18 @@ function buildWidget(ctx: ExtensionContext): string[] {
 		`${slate600("── │")} ${paiBrand} ${paiA("STATUSLINE")} ${slate600("│")} ${headerRight.join(` ${SEP} `)} ${slate600("─────────────────────────────")}`
 	);
 
-	// Line 3: ENV — versions + counts
+	// Line 3: ENV — versions + counts + algo state
 	const skills = getSkillsCount();
 	const exts = getExtensionsCount();
-	const paiVersion = getPaiVersion();
-	const algoVersion = getAlgoVersion();
 	const hooks = getHooksCount();
+	const algo = getAlgoState();
+	const algoLabel = algo.mode === "off" ? slate500("OFF") :
+		algo.mode === "always" ? emerald("ON") : paiA("AUTO");
+	const tierLabel = algo.lastTier ? amber(algo.lastTier.toUpperCase()) :
+		(algo.forceTier ? amber(algo.forceTier.toUpperCase()) : "");
+	const algoDisplay = tierLabel ? `${algoLabel} ${tierLabel}` : algoLabel;
 	lines.push(
-		`${slate400("ENV:")} ${slate400("pi:")} ${paiA(VERSION)} ${SEP} ${slate500("PAI:")}${paiA(paiVersion)} ${slate400("ALG:")}${paiA(algoVersion)} ${SEP} ${cyan("SK:")} ${slate300(`${skills}`)} ${SEP} ${teal("EXT:")} ${slate300(`${exts}`)} ${SEP} ${rgb(6, 182, 212, "Hooks:")} ${slate300(`${hooks}`)}`
+		`${slate400("ENV:")} ${slate400("pi:")} ${paiA(VERSION)} ${SEP} ${slate400("ALG:")}${algoDisplay} ${SEP} ${cyan("SK:")} ${slate300(`${skills}`)} ${SEP} ${teal("EXT:")} ${slate300(`${exts}`)} ${SEP} ${rgb(6, 182, 212, "Hooks:")} ${slate300(`${hooks}`)}`
 	);
 
 	// Line 4: Context bar
@@ -589,6 +590,18 @@ function refresh(ctx: ExtensionContext) {
 export default function pai(pi: ExtensionAPI) {
 	// PAI Skills — discover and register skills from sources.conf
 	registerSkills(pi);
+
+	// PAI Algorithm — structured execution methodology
+	registerAlgorithm(pi);
+
+	// PAI ISA — project Ideal State Artifact
+	registerISA(pi);
+
+	// PAI Session Learning — capture execution patterns
+	registerSessionLearning(pi);
+
+	// PAI Security — block dangerous bash commands
+	registerSecurityGuard(pi);
 
 	// PAI Statusline — HUD widget + footer status
 	pi.on("session_start", async (event, ctx) => {

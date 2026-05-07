@@ -65,7 +65,7 @@
 |---|---------|--------|--------|-------------|
 | 15 | **Tool Discovery (BM25 Search)** | OMP | 4-6h | ✅ Done — BM25 index over all tools with `search_tools` builtin. Field weights: name:6, desc:3, params:1. |
 | 16 | **Auto-Recall on Session Start** | OMP | 3-4h | ✅ Already implemented — cortex `before_agent_start` hook searches memory with prompt, injects top-3 reranked results. |
-| 17 | **Tree-Sitter Code Summarization** | OMP | 6-8h | `read` tool supports `summarize` mode — shows function/class/method signatures without bodies. Requires N-API native binding (tree-sitter). Massive context savings for large files. |
+| 17 | **Tree-Sitter Code Summarization** | OMP | 6-8h | ✅ Done — `outline` extension with web-tree-sitter WASM. Extracts function/class/type signatures without bodies. 5-20x compression. 27 languages. 9-14ms warm latency. |
 | 18 | **Eval Framework (replace python via bash)** | OMP | 4-6h | Fenced `eval.py`/`eval.js` cells in sandboxed VM. Safer than raw bash for computation. |
 | 19 | **Read-Only Tool Parallelism** | Rust | — | ✅ Already implemented — Agent core defaults to `toolExecution: "parallel"`. All tools run concurrently via `Promise.all` unless explicitly marked `executionMode: "sequential"`. |
 | 20 | **Background Compaction Worker** | Rust | Low priority | Compaction already runs async (user can type during it, messages queue). True background thread only marginally better in Node/Bun. Skip unless compaction duration becomes a pain point. |
@@ -74,19 +74,19 @@
 
 | # | Feature | Source | Effort | Description |
 |---|---------|--------|--------|-------------|
-| 21 | **SQLite Session Index** | Rust | 4-6h | Structured index on sessions (by CWD, timestamp, name) without scanning JSONL. Faster `/sessions` at scale. |
+| 21 | **SQLite Session Index** | Rust | 4-6h | ✅ Done — JSON-based session index (`session-index.ts`). 16x speedup: 319ms→20ms. Validates via stat() (no file reads for unchanged sessions). Write-through updates debounced at 2s. |
 | 22 | **ACP (Agent Client Protocol)** | Rust | Days | JSON-RPC 2.0 protocol for IDE integration (Zed-style). Expose pi as a backend for editors via stdio. |
 | 23 | **Tool Output Pruning** | OMP | — | ✅ Already implemented — `compaction/pruning.ts` walks entries newest-to-oldest, protects last 40k tokens + `read`/`skill` tools, replaces older with `[truncated - N tokens]`. Runs before model compaction. |
 | 24 | **Flake Classifier for CI** | Rust | 2h | Classify test failures as deterministic vs transient (timeout, FS contention, port conflict). Auto-retry flaky tests. |
 | 25 | **Session Metrics (Perf Telemetry)** | Rust | 2-3h | Atomic timing counters for save/load/serialize. Gated behind env var. Useful for debugging slow sessions. |
-| 26 | **Content-Based Todo Matching** | OMP | 2h | Match todos by name/content (prefix/substr) instead of IDs. More natural for the model. |
+| 26 | **Content-Based Todo Matching** | OMP | 2h | ✅ Done — `resolveTodoId()` tries hex ID first, then exact/prefix/substr/fuzzy title match. Ambiguous matches show candidates. |
 | 27 | **Extension Scoring** | Rust | Days | Multi-signal scoring for MCP tools: recency, popularity, compat, license, risk gates. Histogram reporting. Over-engineered for now. |
 
 ### Tier 4 — Vision Features (exploratory)
 
-#### 28. Dreaming — Autonomous Self-Improvement from Memory
+#### 28. Dreaming — Autonomous Self-Improvement from Memory ✅ MVP Done
 
-**Concept:** An offline/idle-time process where the agent "dreams" — reviewing past sessions, extracting patterns, and crystallizing learnings into extensions, skills, or config changes.
+**Status:** Implemented as `extensions/dream/`. `/dream` command gathers patterns + logs + memory (~10KB), sends to model for structured analysis, saves proposals to `~/.pi/dreams/`.
 
 **How it could work:**
 1. **Trigger:** Idle detection, scheduled (nightly), or manual `/dream` command

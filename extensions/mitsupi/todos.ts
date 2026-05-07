@@ -169,6 +169,55 @@ function validateTodoId(id: string): { id: string } | { error: string } {
 	return { id: normalized.toLowerCase() };
 }
 
+/**
+ * Resolve a todo reference — by hex ID, or by title/content prefix match.
+ * Falls back to fuzzy title matching when the input is not a valid hex ID.
+ */
+function resolveTodoId(input: string, todosDir: string): { id: string } | { error: string } {
+	// First try as a hex ID
+	const validated = validateTodoId(input);
+	if (!("error" in validated)) return validated;
+
+	// Not a valid hex ID — try title/content matching
+	const query = input.trim().toLowerCase();
+	if (!query || query.length < 2) return validated; // Too short to match
+
+	try {
+		const todos = listTodosSync(todosDir);
+		if (todos.length === 0) return validated;
+
+		// Exact title match
+		const exactMatch = todos.find((t) => t.title.toLowerCase() === query);
+		if (exactMatch) return { id: exactMatch.id };
+
+		// Prefix match on title
+		const prefixMatches = todos.filter((t) => t.title.toLowerCase().startsWith(query));
+		if (prefixMatches.length === 1) return { id: prefixMatches[0].id };
+
+		// Substring match on title
+		const substrMatches = todos.filter((t) => t.title.toLowerCase().includes(query));
+		if (substrMatches.length === 1) return { id: substrMatches[0].id };
+
+		// Fuzzy match
+		const fuzzyMatches = todos
+			.map((t) => ({ todo: t, result: fuzzyMatch(query, t.title.toLowerCase()) }))
+			.filter((m) => m.result.matches)
+			.sort((a, b) => a.result.score - b.result.score);
+		if (fuzzyMatches.length === 1) return { id: fuzzyMatches[0].todo.id };
+
+		// Multiple matches — ambiguous
+		if (prefixMatches.length > 1 || substrMatches.length > 1 || fuzzyMatches.length > 1) {
+			const candidates = (prefixMatches.length > 1 ? prefixMatches : substrMatches.length > 1 ? substrMatches : fuzzyMatches.map((m) => m.todo)).slice(0, 5);
+			const list = candidates.map((t) => `  ${formatTodoId(t.id)} ${t.title}`).join("\n");
+			return { error: `Ambiguous match for "${input}". Did you mean:\n${list}` };
+		}
+
+		return { error: `No todo found matching "${input}". Use TODO-<hex> id or an exact title.` };
+	} catch {
+		return validated; // Fall back to original error on any failure
+	}
+}
+
 function displayTodoId(id: string): string {
 	return formatTodoId(normalizeTodoId(id));
 }
@@ -1277,7 +1326,7 @@ async function updateTodoStatus(
 	status: string,
 	ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> {
-	const validated = validateTodoId(id);
+	const validated = resolveTodoId(id, todosDir);
 	if ("error" in validated) {
 		return { error: validated.error };
 	}
@@ -1309,7 +1358,7 @@ async function claimTodoAssignment(
 	ctx: ExtensionContext,
 	force = false,
 ): Promise<TodoRecord | { error: string }> {
-	const validated = validateTodoId(id);
+	const validated = resolveTodoId(id, todosDir);
 	if ("error" in validated) {
 		return { error: validated.error };
 	}
@@ -1351,7 +1400,7 @@ async function releaseTodoAssignment(
 	ctx: ExtensionContext,
 	force = false,
 ): Promise<TodoRecord | { error: string }> {
-	const validated = validateTodoId(id);
+	const validated = resolveTodoId(id, todosDir);
 	if ("error" in validated) {
 		return { error: validated.error };
 	}
@@ -1390,7 +1439,7 @@ async function deleteTodo(
 	id: string,
 	ctx: ExtensionContext,
 ): Promise<TodoRecord | { error: string }> {
-	const validated = validateTodoId(id);
+	const validated = resolveTodoId(id, todosDir);
 	if ("error" in validated) {
 		return { error: validated.error };
 	}
@@ -1430,7 +1479,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 		description:
 			`Manage file-based todos in ${todosDirLabel} (list, list-all, get, create, update, append, delete, claim, release). ` +
 			"Title is the short summary; body is long-form markdown notes (update replaces, append adds). " +
-			"Todo ids are shown as TODO-<hex>; id parameters accept TODO-<hex> or the raw hex filename. " +
+			"Todo ids are shown as TODO-<hex>; id parameters accept TODO-<hex>, the raw hex filename, or a title/content match. " +
 			"Claim tasks before working on them to avoid conflicts, and close them when complete.", 
 		parameters: TodoParams,
 
@@ -1466,7 +1515,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 							details: { action: "get", error: "id required" },
 						};
 					}
-					const validated = validateTodoId(params.id);
+					const validated = resolveTodoId(params.id, todosDir);
 					if ("error" in validated) {
 						return {
 							content: [{ type: "text", text: validated.error }],
@@ -1533,7 +1582,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 							details: { action: "update", error: "id required" },
 						};
 					}
-					const validated = validateTodoId(params.id);
+					const validated = resolveTodoId(params.id, todosDir);
 					if ("error" in validated) {
 						return {
 							content: [{ type: "text", text: validated.error }],
@@ -1586,7 +1635,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 							details: { action: "append", error: "id required" },
 						};
 					}
-					const validated = validateTodoId(params.id);
+					const validated = resolveTodoId(params.id, todosDir);
 					if ("error" in validated) {
 						return {
 							content: [{ type: "text", text: validated.error }],
@@ -1686,7 +1735,7 @@ export default function todosExtension(pi: ExtensionAPI) {
 						};
 					}
 
-					const validated = validateTodoId(params.id);
+					const validated = resolveTodoId(params.id, todosDir);
 					if ("error" in validated) {
 						return {
 							content: [{ type: "text", text: validated.error }],
