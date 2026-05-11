@@ -31,21 +31,25 @@ To learn more about pi:
 
 ## Fork Extensions
 
-This fork adds 11 extensions in [`extensions/`](extensions/):
+This fork adds 13 extensions in [`extensions/`](extensions/) (48.6k LOC):
 
 | Extension | Purpose |
 |-----------|--------|
 | **[cortex](extensions/cortex)** | Memory system with 10-stage retrieval pipeline, entity graph, pattern mining |
+| **[web-access](extensions/web-access)** | Web search, fetch, YouTube, PDF, GitHub |
+| **[mitsupi](extensions/mitsupi)** | Personal utilities (loop, todos, tool profiles, review) |
+| **[mcp-adapter](extensions/mcp-adapter)** | Token-efficient MCP server gateway |
 | **[stats](extensions/stats)** | Unified AI usage dashboard (pi + Claude Code) — `/stats`, web UI |
 | **[swarm](extensions/swarm)** | Multi-agent deliberation + YAML DAG orchestration |
-| **[web-access](extensions/web-access)** | Web search, fetch, YouTube, PDF, GitHub |
-| **[mcp-adapter](extensions/mcp-adapter)** | Token-efficient MCP server gateway |
 | **[markdown-preview](extensions/markdown-preview)** | Rendered markdown + LaTeX preview |
-| **[mitsupi](extensions/mitsupi)** | Personal utilities (loop, todos, review) |
-| **[pai](extensions/pai)** | PAI skill discovery + HUD statusline |
+| **[pai](extensions/pai)** | PAI skill discovery + Algorithm (E1-E5) + HUD |
+| **[outline](extensions/outline)** | Tree-sitter code summarization (27 langs, 5-20x compression) |
 | **[buddy](extensions/buddy)** | Virtual companion widget |
 | **[ultra](extensions/ultra)** | ULTRA keyword-triggered deep thinking modes |
+| **[dream](extensions/dream)** | Autonomous self-improvement from memory |
 | **[image-ai](extensions/image-ai)** | Image generation (CF FLUX) + recognition (Gemini Flash) |
+
+Tool profiles (`toolProfile: lean|standard|full`) control how many tools the model sees — from 9 (smaller models) to 30+ (frontier).
 
 See [`extensions/README.md`](extensions/README.md) for full details, setup, and attribution.
 
