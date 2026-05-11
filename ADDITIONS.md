@@ -45,7 +45,7 @@ Personal fork of [`badlogic/pi-mono`](https://github.com/badlogic/pi-mono) (v0.7
 │    ~/Developer/PAI/Packs      — 51 skills                    │
 │    ~/Developer/pai-work/Packs — 8 work-specific skills       │
 │                                                              │
-│  2 MCP Servers: docker, telecontext                          │
+│  2 MCP Servers: docker                                       │
 ├─────────────────────────────────────────────────────────────┤
 │ Config (~/.pi/agent/config.yml)                              │
 │  Model: Sonnet 4.6 (Bedrock EU) | Smol: Haiku 4.5           │
@@ -174,7 +174,7 @@ External skill packs loaded via `skills.customDirectories`:
 | Pack | Path | Skills |
 |------|------|--------|
 | PAI Main | `~/Developer/PAI/Packs/` | 51 |
-| PAI Work | `~/Developer/pai-work/Packs/` | 8 (DT-specific) |
+| PAI Work | `~/Developer/pai-work/Packs/` | 8 (work-specific) |
 
 **Categories:**
 - **Thinking:** DeepAnalysis, DeepDebug, Brainstorm, FirstPrinciples, SystemsThinking, RootCauseAnalysis, Science, BeCreative
@@ -186,7 +186,7 @@ External skill packs loaded via `skills.customDirectories`:
 - **Agents:** Delegation, Council, Agents, Prompting, Evals
 - **Web:** Browser, BrightData, Apify, Parser
 - **Meta:** CreateSkill, CreateCLI, PAIUpgrade, Telos
-- **Work-specific:** azure, dt-confluence, dt-gitlab, dt-jira, mail-craft, outlook, pptx, telecontext
+- **Work-specific:** azure, pptx, and internal tools (separate repo, not in pi-mono)
 
 ---
 
@@ -236,7 +236,7 @@ modelRoles:
 defaultThinkingLevel: high
 ```
 
-MCP servers: `~/.pi/agent/mcp.json` (docker, telecontext)
+MCP servers: `~/.pi/agent/mcp.json` (docker)
 
 ---
 
