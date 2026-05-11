@@ -26,6 +26,25 @@
 
 ## Active
 
+### 31. Tool Profiles — Model-Appropriate Tool Sets
+
+**Status:** ✅ Implemented (2026-05-11)
+**Priority:** High
+
+Added `toolProfile` setting with three tiers:
+- **lean** (9 tools): bash, read, write, edit, outline, web_search, memory_search, memory_store, todo
+- **standard** (17 tools): + fetch_content, code_search, get_search_content, generate_image, analyze_image, scratchpad, mcp, signal_loop_success
+- **full** (30+ tools): + crystallize_skill, create_extension, audit_skill, capabilities_query, converse, end_deliberation, recruit_specialist, send_to_session, list_sessions, grep, find, ls, search_tools
+
+Implementation:
+- `toolProfile` setting in config.yml (default: `full` for backwards compat)
+- Leverages existing `_allowedToolNames` whitelist in AgentSession
+- `/tools` command to view/switch profiles
+- Re-read on `/reload`
+- SDK `allowedToolNames` override takes precedence
+
+---
+
 ### 5. Swarm — Interactive Dialogue Testing
 
 **Status:** Live-tested, mostly working

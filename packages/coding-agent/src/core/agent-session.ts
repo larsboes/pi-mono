@@ -84,7 +84,7 @@ import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.js
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.js";
 import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.js";
 import { CURRENT_SESSION_VERSION, getLatestCompactionEntry, type SessionHeader } from "./session-manager.js";
-import type { SettingsManager } from "./settings-manager.js";
+import { type SettingsManager, TOOL_PROFILES } from "./settings-manager.js";
 import type { SlashCommandInfo } from "./slash-commands.js";
 import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.js";
 import { type BuildSystemPromptOptions, buildSystemPrompt } from "./system-prompt.js";
@@ -291,6 +291,7 @@ export class AgentSession {
 	private _extensionRunnerRef?: { current?: ExtensionRunner };
 	private _initialActiveToolNames?: string[];
 	private _allowedToolNames?: Set<string>;
+	private _allowedToolNamesFromSDK: boolean = false;
 	private _baseToolsOverride?: Record<string, AgentTool>;
 	private _sessionStartEvent: SessionStartEvent;
 	private _extensionUIContext?: ExtensionUIContext;
@@ -323,7 +324,12 @@ export class AgentSession {
 		this._modelRegistry = config.modelRegistry;
 		this._extensionRunnerRef = config.extensionRunnerRef;
 		this._initialActiveToolNames = config.initialActiveToolNames;
-		this._allowedToolNames = config.allowedToolNames ? new Set(config.allowedToolNames) : undefined;
+		if (config.allowedToolNames) {
+			this._allowedToolNames = new Set(config.allowedToolNames);
+			this._allowedToolNamesFromSDK = true;
+		} else {
+			this._allowedToolNames = this._getToolProfileAllowedNames();
+		}
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
 
@@ -2247,6 +2253,16 @@ export class AgentSession {
 		);
 	}
 
+	/**
+	 * Get the allowed tool names based on the configured tool profile.
+	 * Returns undefined for "full" profile (no restrictions).
+	 */
+	private _getToolProfileAllowedNames(): Set<string> | undefined {
+		const profile = this.settingsManager.getToolProfile();
+		if (profile === "full") return undefined; // no restrictions
+		return TOOL_PROFILES[profile];
+	}
+
 	private _refreshToolRegistry(options?: { activeToolNames?: string[]; includeAllExtensionTools?: boolean }): void {
 		const previousRegistryNames = new Set(this._toolRegistry.keys());
 		const previousActiveToolNames = this.getActiveToolNames();
@@ -2385,6 +2401,12 @@ export class AgentSession {
 		}
 		this._bindExtensionCore(this._extensionRunner);
 		this._applyExtensionBindings(this._extensionRunner);
+
+		// Re-read tool profile from settings (handles /reload picking up config changes)
+		// Skip if allowedToolNames was explicitly set via SDK at construction
+		if (!this._allowedToolNamesFromSDK && !this._baseToolsOverride) {
+			this._allowedToolNames = this._getToolProfileAllowedNames();
+		}
 
 		const defaultActiveToolNames = this._baseToolsOverride
 			? Object.keys(this._baseToolsOverride)

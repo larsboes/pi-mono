@@ -14,6 +14,7 @@ import promptEditor from "./prompt-editor.js";
 import review from "./review.js";
 import sessionBreakdown from "./session-breakdown.js";
 import todos from "./todos.js";
+import toolProfile from "./tool-profile.js";
 import uv from "./uv.js";
 import whimsical from "./whimsical.js";
 
@@ -29,6 +30,7 @@ export default function (pi: ExtensionAPI) {
 	review(pi);
 	sessionBreakdown(pi);
 	todos(pi);
+	toolProfile(pi);
 	uv(pi);
 	whimsical(pi);
 }
