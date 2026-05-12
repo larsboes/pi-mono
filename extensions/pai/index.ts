@@ -580,12 +580,16 @@ function telosSystemPromptAddition(existingPrompt: string): string {
 // ── Refresh ──────────────────────────────────────────────────────────────────
 
 function refresh(ctx: ExtensionContext) {
-	if (!ctx.hasUI) return;
+	try {
+		if (!ctx.hasUI) return;
 
-	if (widgetEnabled) {
-		ctx.ui.setWidget("pai-statusline", buildWidget(ctx), {
-			placement: "belowEditor",
-		});
+		if (widgetEnabled) {
+			ctx.ui.setWidget("pai-statusline", buildWidget(ctx), {
+				placement: "belowEditor",
+			});
+		}
+	} catch {
+		// ctx may be stale after session replacement — silently ignore
 	}
 }
 
@@ -625,7 +629,7 @@ export default function pai(pi: ExtensionAPI) {
 		sessionStartTime = Date.now();
 		// Fetch location/weather on fresh starts (non-blocking)
 		if (event.reason === "startup" || event.reason === "new") {
-			refreshLocationAndWeather().then(() => refresh(ctx)).catch(() => {});
+			refreshLocationAndWeather().catch(() => {});
 		}
 		refresh(ctx);
 	});
@@ -649,12 +653,14 @@ export default function pai(pi: ExtensionAPI) {
 
 	// Print session ID on quit so the user can resume with `pi --session <id>`
 	pi.on("session_shutdown", async (event, ctx) => {
-		if (event.reason === "quit") {
-			const id = ctx.sessionManager.getSessionId();
-			const name = ctx.sessionManager.getSessionName?.();
-			const label = name ? `${name} (${id.slice(0, 8)})` : id.slice(0, 8);
-			console.error(`\x1b[2mSession: ${label} — resume with: pi -c\x1b[0m`);
-		}
+		try {
+			if (event.reason === "quit") {
+				const id = ctx.sessionManager.getSessionId();
+				const name = ctx.sessionManager.getSessionName?.();
+				const label = name ? `${name} (${id.slice(0, 8)})` : id.slice(0, 8);
+				console.error(`\x1b[2mSession: ${label} — resume with: pi -c\x1b[0m`);
+			}
+		} catch {}
 	});
 
 	// Inject TELOS from the vault into the system prompt on every agent turn.

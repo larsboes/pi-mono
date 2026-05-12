@@ -176,19 +176,19 @@ export function registerSessionLearning(pi: ExtensionAPI) {
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
-		const messages = event.messages || [];
-		if (messages.length < 2) return; // Skip trivial interactions
+		try {
+			const messages = event.messages || [];
+			if (messages.length < 2) return;
 
-		const learning = extractLearnings(messages, sessionStartTime, ctx.cwd);
+			const learning = extractLearnings(messages, sessionStartTime, ctx.cwd);
 
-		// Only record non-trivial sessions (at least 1 tool used)
-		const totalTools = Object.values(learning.toolsUsed).reduce((s, n) => s + n, 0);
-		if (totalTools > 0) {
-			appendLearning(learning);
-		}
+			const totalTools = Object.values(learning.toolsUsed).reduce((s, n) => s + n, 0);
+			if (totalTools > 0) {
+				appendLearning(learning);
+			}
 
-		// Reset timer for next agent run
-		sessionStartTime = Date.now();
+			sessionStartTime = Date.now();
+		} catch {}
 	});
 
 	// /learnings command
