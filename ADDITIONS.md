@@ -1,7 +1,7 @@
 # Fork Additions — Lars Boes
 
-Personal fork of [`badlogic/pi-mono`](https://github.com/badlogic/pi-mono) (v0.74.0).  
-36 commits ahead of upstream. Last synced: 2026-05-07.
+Personal fork of [`earendil-works/pi-mono`](https://github.com/earendil-works/pi-mono) (v0.74.0+).  
+2 commits ahead of upstream. Last synced: 2026-05-13.
 
 ---
 

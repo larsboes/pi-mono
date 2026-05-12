@@ -1,9 +1,9 @@
 # Fork configuration — declarative record of how this fork relates to upstream.
 
 upstream: https://github.com/earendil-works/pi-mono.git
-last_synced: "2026-05-07"
-last_upstream_commit: f348a062
-fork_branch: dev
+last_synced: "2026-05-13"
+last_upstream_commit: 2726e57c
+fork_branch: main
 
 # Rule: everything new lives in extensions/ — no new files in packages/.
 # Only the files in scripts/allowed-packages-diff.txt are allowed to diverge.

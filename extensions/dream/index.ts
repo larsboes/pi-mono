@@ -40,7 +40,7 @@ interface DreamProposal {
 	evidence: string[];
 	effort: "trivial" | "small" | "medium" | "large";
 	priority: "high" | "medium" | "low";
-	action?: string; // Concrete action to take (code, config, etc.)
+	action?: string;
 }
 
 interface DreamReport {
@@ -101,16 +101,13 @@ async function gatherDailyLogs(days = 7): Promise<string> {
 }
 
 async function gatherMemories(): Promise<string> {
-	// Long-term memories are in MEMORY.md
 	const memoryFile = join(MEMORY_DIR, "MEMORY.md");
 	if (!existsSync(memoryFile)) return "No stored memories.";
 
 	try {
 		const raw = await readFile(memoryFile, "utf-8");
 		const lines = raw.trim().split("\n").filter(Boolean);
-		// Take last ~3000 chars (most recent entries)
 		const recentContent = raw.slice(-3000);
-
 		return `## Long-term Memory (${lines.length} lines, showing recent)\n\n${recentContent}`;
 	} catch {
 		return "Failed to read memories.";
@@ -189,49 +186,14 @@ Only propose improvements that have CLEAR evidence from the data. Do not specula
 Respond ONLY with the JSON array, no other text.`;
 }
 
-// ── Dream Execution ──────────────────────────────────────────────────────────
-
-async function executeDream(
-	ctx: any,
-): Promise<DreamReport> {
-	// 1. GATHER
-	const [patterns, logs, memories, entities] = await Promise.all([
-		gatherPatterns(),
-		gatherDailyLogs(7),
-		gatherMemories(),
-		gatherEntityGraph(),
-	]);
-
-	const patternsCount = (patterns.match(/\|.*\|.*\|/g) || []).length - 1;
-	const logsCount = (logs.match(/### \d{4}/g) || []).length;
-	const memoriesCount = (memories.match(/^- \[/gm) || []).length;
-
-	// 2. ANALYZE — Send to the model
-	const prompt = buildDreamPrompt(patterns, logs, memories, entities);
-
-	// Use the agent's sendMessage to trigger an analysis turn
-	const report: DreamReport = {
-		timestamp: new Date().toISOString(),
-		dataGathered: {
-			patternsAnalyzed: patternsCount,
-			dailyLogsScanned: logsCount,
-			memoriesReviewed: memoriesCount,
-		},
-		proposals: [],
-	};
-
-	return { ...report, _prompt: prompt } as any;
-}
-
 // ── Extension Entry ──────────────────────────────────────────────────────────
 
 export default function dream(pi: ExtensionAPI): void {
 	pi.registerCommand("dream", {
 		description: "Review recent sessions and propose self-improvements",
-		async handler(ctx) {
-			ctx.ui.notify("[dream] Gathering data from cortex...", "info");
+		async handler(_args, ctx) {
+			ctx.notify("[dream] Gathering data from cortex...", "info");
 
-			// Gather all data
 			const [patterns, logs, memories, entities] = await Promise.all([
 				gatherPatterns(),
 				gatherDailyLogs(7),
@@ -240,12 +202,10 @@ export default function dream(pi: ExtensionAPI): void {
 			]);
 
 			const dataSize = patterns.length + logs.length + memories.length + entities.length;
-			ctx.ui.notify(`[dream] Gathered ${(dataSize / 1024).toFixed(1)}KB of context. Analyzing...`, "info");
+			ctx.notify(`[dream] Gathered ${(dataSize / 1024).toFixed(1)}KB of context. Analyzing...`, "info");
 
-			// Build the analysis prompt and send it as a message to the agent
 			const prompt = buildDreamPrompt(patterns, logs, memories, entities);
 
-			// Send as a follow-up message to get the model's analysis
 			ctx.sendMessage(
 				{
 					customType: "dream_analysis",
@@ -260,13 +220,12 @@ export default function dream(pi: ExtensionAPI): void {
 		},
 	});
 
-	// Also register a /dream report command to view past dream outputs
 	pi.registerCommand("dream-report", {
 		description: "View the latest dream analysis report",
-		async handler(ctx) {
+		async handler(_args, ctx) {
 			const reportFile = join(DREAM_DIR, "latest.json");
 			if (!existsSync(reportFile)) {
-				ctx.ui.notify("[dream] No dream reports yet. Run /dream first.", "info");
+				ctx.notify("[dream] No dream reports yet. Run /dream first.", "info");
 				return;
 			}
 
@@ -280,7 +239,10 @@ export default function dream(pi: ExtensionAPI): void {
 				ctx.sendMessage(
 					{
 						customType: "dream_report",
-						content: [{ type: "text", text: `## Dream Report (${report.timestamp.slice(0, 10)})\n\n**Data:** ${report.dataGathered.patternsAnalyzed} patterns, ${report.dataGathered.dailyLogsScanned} daily logs, ${report.dataGathered.memoriesReviewed} memories\n\n**Proposals:**\n${summary}` }],
+						content: [{
+							type: "text",
+							text: `## Dream Report (${report.timestamp.slice(0, 10)})\n\n**Data:** ${report.dataGathered.patternsAnalyzed} patterns, ${report.dataGathered.dailyLogsScanned} daily logs, ${report.dataGathered.memoriesReviewed} memories\n\n**Proposals:**\n${summary}`,
+						}],
 						display: {
 							label: "dream",
 							text: `${report.proposals.length} proposals from ${report.timestamp.slice(0, 10)}`,
@@ -289,25 +251,22 @@ export default function dream(pi: ExtensionAPI): void {
 					{ triggerTurn: false },
 				);
 			} catch {
-				ctx.ui.notify("[dream] Failed to read dream report.", "error");
+				ctx.notify("[dream] Failed to read dream report.", "error");
 			}
 		},
 	});
 
-	// Hook: After model responds to a dream analysis, save the report
-	pi.on("message_end", async (event, ctx) => {
-		// Check if this was a response to a dream analysis
+	// After model responds to a dream analysis, save the report
+	pi.on("message_end", async (event) => {
 		const message = event.message;
 		if (!message || message.role !== "assistant") return;
 
-		// Look for JSON proposals in the response
 		const text = typeof message.content === "string"
 			? message.content
 			: Array.isArray(message.content)
 				? message.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("")
 				: "";
 
-		// Only process if it looks like dream output (contains proposals JSON)
 		const jsonMatch = text.match(/\[\s*\{[\s\S]*"type"\s*:\s*"(skill|extension|config|workflow|fix)"[\s\S]*\}\s*\]/);
 		if (!jsonMatch) return;
 
@@ -315,20 +274,19 @@ export default function dream(pi: ExtensionAPI): void {
 			const proposals = JSON.parse(jsonMatch[0]) as DreamProposal[];
 			if (!Array.isArray(proposals) || proposals.length === 0) return;
 
-			// Save the report
 			if (!existsSync(DREAM_DIR)) await mkdir(DREAM_DIR, { recursive: true });
 			const report: DreamReport = {
 				timestamp: new Date().toISOString(),
 				dataGathered: { patternsAnalyzed: 0, dailyLogsScanned: 0, memoriesReviewed: 0 },
 				proposals: proposals.map((p, i) => ({ ...p, id: `dream-${Date.now()}-${i}` })),
 			};
-			await writeFile(join(DREAM_DIR, "latest.json"), JSON.stringify(report, null, 2));
-			await writeFile(
-				join(DREAM_DIR, `${new Date().toISOString().slice(0, 10)}.json`),
-				JSON.stringify(report, null, 2),
-			);
+			const dateStr = new Date().toISOString().slice(0, 10);
+			await Promise.all([
+				writeFile(join(DREAM_DIR, "latest.json"), JSON.stringify(report, null, 2)),
+				writeFile(join(DREAM_DIR, `${dateStr}.json`), JSON.stringify(report, null, 2)),
+			]);
 		} catch {
-			// Failed to parse — not a dream response
+			// Not a dream response — ignore
 		}
 	});
 }
