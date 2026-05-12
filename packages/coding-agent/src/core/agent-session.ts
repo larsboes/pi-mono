@@ -2372,10 +2372,6 @@ export class AgentSession {
 			: createAllToolDefinitions(this._cwd, {
 					read: { autoResizeImages },
 					bash: { commandPrefix: shellCommandPrefix, shellPath },
-					searchTools: {
-						getAllTools: () => this.getAllTools(),
-						getActiveToolNames: () => this.getActiveToolNames(),
-					},
 				});
 
 		this._baseToolDefinitions = new Map(

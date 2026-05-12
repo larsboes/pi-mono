@@ -1,0 +1,39 @@
+name: upstream-drift
+
+on:
+  schedule:
+    - cron: '0 8 * * MON'  # weekly Monday morning
+  workflow_dispatch:        # manual trigger
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/earendil-works/pi-mono.git
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Report drift
+        run: |
+          BEHIND=$(git log --oneline HEAD..upstream/main | wc -l | tr -d ' ')
+          AHEAD=$(git log --oneline upstream/main..HEAD | wc -l | tr -d ' ')
+          echo "## Upstream Drift Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ahead** of upstream: $AHEAD commits" >> $GITHUB_STEP_SUMMARY
+          echo "- **Behind** upstream: $BEHIND commits" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "$BEHIND" -gt 0 ]]; then
+            echo "### Upstream commits not in fork" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            git log --oneline HEAD..upstream/main >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check packages/ drift
+        run: bash scripts/check-packages-drift.sh

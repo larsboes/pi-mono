@@ -1,0 +1,29 @@
+# Fork configuration — declarative record of how this fork relates to upstream.
+
+upstream: https://github.com/earendil-works/pi-mono.git
+last_synced: "2026-05-07"
+last_upstream_commit: f348a062
+fork_branch: dev
+
+# Rule: everything new lives in extensions/ — no new files in packages/.
+# Only the files in scripts/allowed-packages-diff.txt are allowed to diverge.
+
+extensions:
+  public:
+    dir: extensions/
+    symlinked_to: ~/.pi/agent/extensions/
+    repo: https://github.com/larsboes/pi-mono
+  private:
+    # Never referenced here — boundary rule: DT content stays in DT GitLab
+    symlinked_to: ~/.pi/agent/extensions/
+    note: dt-extensions repo on DT GitLab
+
+skills:
+  public: ~/Developer/PAI/Packs
+  private: ~/Developer/pai-work/Packs   # DT GitLab only
+  discovery: ~/.pai/sources.conf
+
+sync:
+  script: scripts/sync-upstream.sh
+  ci_check: scripts/check-packages-drift.sh
+  drift_ci: .github/workflows/upstream-drift.yml

@@ -1,12 +1,23 @@
 /**
- * Workspace tree generation for system prompt injection.
- *
- * Generates a compact, depth-limited directory tree of the working directory
- * so the agent immediately knows the project structure without needing `ls`.
+ * Workspace tree — injects project structure into system prompt via before_agent_start.
+ * Moved from packages/coding-agent/src/core/workspace-tree.ts to keep packages/ clean for upstream merges.
  */
+
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+export function registerWorkspaceTree(pi: ExtensionAPI): void {
+	pi.on("before_agent_start", (event) => {
+		const cwd = event.systemPromptOptions?.cwd;
+		if (!cwd) return;
+		const tree = buildWorkspaceTree(cwd);
+		if (tree) {
+			return { systemPrompt: event.systemPrompt + `\n\n<workspace-tree>\n${tree}\n</workspace-tree>` };
+		}
+	});
+}
 
 export interface WorkspaceTreeOptions {
 	/** Maximum depth to traverse (default: 3) */

@@ -1,0 +1,32 @@
+# Files intentionally diverged from upstream in packages/.
+# Each entry must have a comment explaining why it can't live in extensions/.
+#
+# Rule: if a feature CAN be an extension, it MUST be an extension.
+# Only list files here when the extension API genuinely can't support it.
+
+# ── compaction/pruning.ts ──────────────────────────────────────────────────
+# Pre-compaction tool-output pruning. Runs BEFORE the model call, so
+# session_compact (which fires after) can't be used. Needs direct access to
+# agent-session's branch entries at the right time.
+packages/coding-agent/src/core/compaction/index.ts
+packages/coding-agent/src/core/compaction/pruning.ts
+
+# ── error-hints.ts ─────────────────────────────────────────────────────────
+# Appends actionable hints to error messages in interactive-mode.ts.
+# No extension event fires at the error render point.
+packages/coding-agent/src/core/error-hints.ts
+packages/coding-agent/src/modes/interactive/interactive-mode.ts
+
+# ── session-index.ts ───────────────────────────────────────────────────────
+# Persistent session metadata cache — deep integration into session-manager.ts
+# for debounced write-through updates and session listing. No extension hook
+# for session listing.
+packages/coding-agent/src/core/session-index.ts
+packages/coding-agent/src/core/session-manager.ts
+
+# ── compaction thresholds in compaction.ts ─────────────────────────────────
+# thresholdTokens/thresholdPercent settings for compaction. Could file upstream PR.
+packages/coding-agent/src/core/compaction/compaction.ts
+
+# ── agent-session.ts (tool profiles + pruning wiring) ─────────────────────
+packages/coding-agent/src/core/agent-session.ts

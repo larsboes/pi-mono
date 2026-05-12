@@ -6,10 +6,9 @@
  * doesn't know which one to use.
  */
 
-import type { AgentToolResult, AgentToolUpdateCallback } from "@earendil-works/pi-agent-core";
-import { type Static, Type } from "typebox";
-import type { ExtensionContext, ToolDefinition } from "../extensions/types.js";
-import { buildToolSearchIndex, type DiscoverableTool, searchTools, type ToolSearchIndex } from "../tool-discovery.js";
+import type { AgentToolResult, AgentToolUpdateCallback, ExtensionAPI, ExtensionContext, ToolDefinition } from "@mariozechner/pi-coding-agent";
+import { Type, type Static } from "typebox";
+import { buildToolSearchIndex, type DiscoverableTool, searchTools, type ToolSearchIndex } from "./tool-discovery.js";
 
 const searchToolsSchema = Type.Object({
 	query: Type.String({
@@ -104,4 +103,13 @@ function getParameterKeys(parameters: unknown): string[] {
 	const props = (parameters as { properties?: unknown }).properties;
 	if (!props || typeof props !== "object" || Array.isArray(props)) return [];
 	return Object.keys(props as Record<string, unknown>);
+}
+
+export function registerSearchTools(pi: ExtensionAPI): void {
+	pi.registerTool(
+		createSearchToolsDefinition(
+			() => pi.getAllTools(),
+			() => pi.getActiveTools(),
+		),
+	);
 }

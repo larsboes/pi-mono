@@ -14,6 +14,9 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { registerSkills } from "./skills.js";
+import { registerSkillNudge } from "./skill-nudge.js";
+import { registerWorkspaceTree } from "./workspace-tree.js";
+import { registerSearchTools } from "./search-tools.js";
 import { registerAlgorithm, getAlgoState } from "./algorithm.js";
 import { registerISA, buildISAContext } from "./isa.js";
 import { registerSessionLearning } from "./session-learning.js";
@@ -591,6 +594,15 @@ function refresh(ctx: ExtensionContext) {
 export default function pai(pi: ExtensionAPI) {
 	// PAI Skills — discover and register skills from sources.conf
 	registerSkills(pi);
+
+	// PAI Skill Nudge — compact skill index in system prompt
+	registerSkillNudge(pi);
+
+	// Workspace tree — inject project structure into system prompt
+	registerWorkspaceTree(pi);
+
+	// Search tools — BM25 tool discovery via search_tools builtin
+	registerSearchTools(pi);
 
 	// PAI Algorithm — structured execution methodology
 	registerAlgorithm(pi);

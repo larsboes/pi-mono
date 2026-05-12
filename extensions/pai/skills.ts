@@ -44,14 +44,18 @@ function findSkillDirs(root: string, skipList: Set<string>, maxDepth = 4): strin
 			const entries = readdirSync(dir, { withFileTypes: true });
 
 			// Check if this dir has a SKILL.md
-			if (entries.some(e => e.isFile() && e.name === "SKILL.md")) {
+			const hasSkillMd = entries.some(e => e.isFile() && e.name === "SKILL.md");
+			if (hasSkillMd) {
 				const name = dir.split("/").pop() || "";
 				if (!skipList.has(name)) {
 					results.push(dir);
 				}
+				// If this dir ALSO has subdirs with SKILL.md (meta-pack pattern),
+				// skip recursing — sub-skills exist at top-level already
+				return;
 			}
 
-			// Recurse into subdirs
+			// Recurse into subdirs only for dirs without SKILL.md
 			for (const entry of entries) {
 				if (!entry.isDirectory()) continue;
 				if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
