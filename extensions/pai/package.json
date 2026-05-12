@@ -1,0 +1,25 @@
+{
+  "name": "@larsboes/pi-pai",
+  "version": "1.0.0",
+  "description": "PAI integration for pi — skill discovery from sources.conf + HUD statusline widget",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-ai": "file:../../packages/ai",
+    "@mariozechner/pi-coding-agent": "file:../../packages/coding-agent",
+    "@mariozechner/pi-tui": "file:../../packages/tui",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48"
+  }
+}

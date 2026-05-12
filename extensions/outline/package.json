@@ -1,0 +1,15 @@
+{
+	"name": "@mariozechner/pi-outline",
+	"version": "1.0.0",
+	"description": "Tree-sitter powered code outline/summarization for pi",
+	"type": "module",
+	"main": "./index.ts",
+	"dependencies": {
+		"tree-sitter-wasms": "^0.1.13",
+		"web-tree-sitter": "^0.22.6"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"typebox": "*"
+	}
+}
