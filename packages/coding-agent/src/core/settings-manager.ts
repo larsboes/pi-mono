@@ -73,11 +73,14 @@ export type PackageSource =
 			themes?: string[];
 	  };
 
+export type ToolProfile = "lean" | "standard" | "full";
+
 export interface Settings {
 	lastChangelogVersion?: string;
 	defaultProvider?: string;
 	defaultModel?: string;
 	defaultThinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+	toolProfile?: ToolProfile;
 	transport?: TransportSetting; // default: "auto"
 	steeringMode?: "all" | "one-at-a-time";
 	followUpMode?: "all" | "one-at-a-time";
@@ -111,6 +114,92 @@ export interface Settings {
 	warnings?: WarningSettings;
 	sessionDir?: string; // Custom session storage directory (same format as --session-dir CLI flag)
 }
+
+/**
+ * Tool profiles define which tools are available to the model.
+ *
+ * - lean: Minimal set for smaller/cheaper models (9 tools: bash, read, write, edit, outline, web_search, memory_search, memory_store, todo)
+ * - standard: Default set with web access, images, and memory (adds: fetch_content, code_search, generate_image, analyze_image, scratchpad, mcp)
+ * - full: Everything including meta-tools and orchestration (adds: crystallize_skill, create_extension, audit_skill, capabilities_query, converse, end_deliberation, recruit_specialist, send_to_session, list_sessions)
+ */
+export const TOOL_PROFILES: Record<ToolProfile, Set<string>> = {
+	lean: new Set([
+		// Core coding
+		"bash",
+		"read",
+		"write",
+		"edit",
+		"outline",
+		// Essential web + memory
+		"web_search",
+		"memory_search",
+		"memory_store",
+		// Task tracking
+		"todo",
+	]),
+	standard: new Set([
+		// Core coding
+		"bash",
+		"read",
+		"write",
+		"edit",
+		"outline",
+		// Web access
+		"web_search",
+		"code_search",
+		"fetch_content",
+		"get_search_content",
+		// Memory
+		"memory_search",
+		"memory_store",
+		"scratchpad",
+		// Images (on demand)
+		"generate_image",
+		"analyze_image",
+		// Task tracking
+		"todo",
+		// MCP gateway
+		"mcp",
+		// Loop control (conditional — only matters when loop is active)
+		"signal_loop_success",
+	]),
+	full: new Set([
+		// Everything in standard
+		"bash",
+		"read",
+		"write",
+		"edit",
+		"outline",
+		"web_search",
+		"code_search",
+		"fetch_content",
+		"get_search_content",
+		"memory_search",
+		"memory_store",
+		"scratchpad",
+		"generate_image",
+		"analyze_image",
+		"todo",
+		"mcp",
+		"signal_loop_success",
+		// Meta/self-modification tools
+		"crystallize_skill",
+		"create_extension",
+		"audit_skill",
+		"capabilities_query",
+		// Orchestration
+		"converse",
+		"end_deliberation",
+		"recruit_specialist",
+		"send_to_session",
+		"list_sessions",
+		// Legacy file exploration (bash covers these)
+		"grep",
+		"find",
+		"ls",
+		"search_tools",
+	]),
+};
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
 function deepMergeSettings(base: Settings, overrides: Settings): Settings {
@@ -1062,6 +1151,16 @@ export class SettingsManager {
 	setWarnings(warnings: WarningSettings): void {
 		this.globalSettings.warnings = { ...warnings };
 		this.markModified("warnings");
+		this.save();
+	}
+
+	getToolProfile(): ToolProfile {
+		return this.settings.toolProfile ?? "full";
+	}
+
+	setToolProfile(profile: ToolProfile): void {
+		this.globalSettings.toolProfile = profile;
+		this.markModified("toolProfile");
 		this.save();
 	}
 }

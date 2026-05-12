@@ -33,8 +33,6 @@ import {
 	type Component,
 	Container,
 	fuzzyFilter,
-	getCapabilities,
-	hyperlink,
 	Loader,
 	type LoaderIndicatorOptions,
 	Markdown,
@@ -60,6 +58,7 @@ import {
 } from "../../config.js";
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
 import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
+import { formatErrorWithHints } from "../../core/error-hints.js";
 import type {
 	AutocompleteProviderFactory,
 	EditorFactory,
@@ -108,7 +107,7 @@ import { ExtensionEditorComponent } from "./components/extension-editor.js";
 import { ExtensionInputComponent } from "./components/extension-input.js";
 import { ExtensionSelectorComponent } from "./components/extension-selector.js";
 import { FooterComponent } from "./components/footer.js";
-import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.js";
+import { keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.js";
 import { LoginDialogComponent } from "./components/login-dialog.js";
 import { ModelSelectorComponent } from "./components/model-selector.js";
 import { type AuthSelectorProvider, OAuthSelectorComponent } from "./components/oauth-selector.js";
@@ -658,6 +657,12 @@ export class InteractiveMode {
 
 		// Render initial messages AFTER showing loaded resources
 		this.renderInitialMessages();
+
+		// Restore editor draft from previous session (if any)
+		const draft = this.sessionManager.loadDraft();
+		if (draft && !this.editor.getText().trim()) {
+			this.editor.setText(draft);
+		}
 
 		// Set up theme file watcher
 		onThemeChange(() => {
@@ -2532,6 +2537,11 @@ export class InteractiveMode {
 				await this.handleCompactCommand(customInstructions);
 				return;
 			}
+			if (text === "/retry") {
+				this.editor.setText("");
+				await this.handleRetryCommand();
+				return;
+			}
 			if (text === "/reload") {
 				this.editor.setText("");
 				await this.handleReloadCommand();
@@ -2892,8 +2902,9 @@ export class InteractiveMode {
 					if (event.reason === "manual") {
 						this.showError(event.errorMessage);
 					} else {
+						const enhanced = formatErrorWithHints(event.errorMessage);
 						this.chatContainer.addChild(new Spacer(1));
-						this.chatContainer.addChild(new Text(theme.fg("error", event.errorMessage), 1, 0));
+						this.chatContainer.addChild(new Text(theme.fg("error", enhanced), 1, 0));
 					}
 				}
 				void this.flushCompactionQueue({ willRetry: event.willRetry });
@@ -3226,6 +3237,12 @@ export class InteractiveMode {
 		this.isShuttingDown = true;
 		this.unregisterSignalHandlers();
 
+		// Save editor draft for later resume
+		const editorText = this.editor.getText();
+		if (editorText.trim()) {
+			this.sessionManager.saveDraft(editorText);
+		}
+
 		// Drain any in-flight Kitty key release events before stopping.
 		// This prevents escape sequences from leaking to the parent shell over slow SSH.
 		await this.ui.terminal.drainInput(1000);
@@ -3503,8 +3520,9 @@ export class InteractiveMode {
 	}
 
 	showError(errorMessage: string): void {
+		const enhanced = formatErrorWithHints(errorMessage);
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new Text(theme.fg("error", `Error: ${errorMessage}`), 1, 0));
+		this.chatContainer.addChild(new Text(theme.fg("error", `Error: ${enhanced}`), 1, 0));
 		this.ui.requestRender();
 	}
 
@@ -3517,11 +3535,11 @@ export class InteractiveMode {
 	showNewVersionNotification(newVersion: string): void {
 		const action = theme.fg("accent", `${APP_NAME} update`);
 		const updateInstruction = theme.fg("muted", `New version ${newVersion} is available. Run `) + action;
-		const changelogUrl = "https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/CHANGELOG.md";
-		const changelogLink = getCapabilities().hyperlinks
-			? hyperlink(theme.fg("accent", "open changelog"), changelogUrl)
-			: theme.fg("accent", changelogUrl);
-		const changelogLine = theme.fg("muted", "Changelog: ") + changelogLink;
+		const changelogUrl = theme.fg(
+			"accent",
+			"https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/CHANGELOG.md",
+		);
+		const changelogLine = theme.fg("muted", "Changelog: ") + changelogUrl;
 
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new DynamicBorder((text) => theme.fg("warning", text)));
@@ -5138,17 +5156,32 @@ export class InteractiveMode {
 	}
 
 	/**
+	 * Capitalize keybinding for display (e.g., "ctrl+c" -> "Ctrl+C").
+	 */
+	private capitalizeKey(key: string): string {
+		return key
+			.split("/")
+			.map((k) =>
+				k
+					.split("+")
+					.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+					.join("+"),
+			)
+			.join("/");
+	}
+
+	/**
 	 * Get capitalized display string for an app keybinding action.
 	 */
 	private getAppKeyDisplay(action: AppKeybinding): string {
-		return keyDisplayText(action);
+		return this.capitalizeKey(keyText(action));
 	}
 
 	/**
 	 * Get capitalized display string for an editor keybinding action.
 	 */
 	private getEditorKeyDisplay(action: Keybinding): string {
-		return keyDisplayText(action);
+		return this.capitalizeKey(keyText(action));
 	}
 
 	private handleHotkeysCommand(): void {
@@ -5252,7 +5285,7 @@ export class InteractiveMode {
 `;
 			for (const [key, shortcut] of shortcuts) {
 				const description = shortcut.description ?? shortcut.extensionPath;
-				const keyDisplay = formatKeyText(key, { capitalize: true });
+				const keyDisplay = key.replace(/\b\w/g, (c) => c.toUpperCase());
 				hotkeys += `| \`${keyDisplay}\` | ${description} |\n`;
 			}
 		}
@@ -5428,6 +5461,36 @@ export class InteractiveMode {
 
 		this.bashComponent = undefined;
 		this.ui.requestRender();
+	}
+
+	private async handleRetryCommand(): Promise<void> {
+		if (this.session.isStreaming) {
+			this.showWarning("Cannot retry while streaming");
+			return;
+		}
+
+		const userMessages = this.session.getUserMessagesForForking();
+		if (userMessages.length === 0) {
+			this.showWarning("No messages to retry");
+			return;
+		}
+
+		const lastUserMsg = userMessages[userMessages.length - 1];
+		try {
+			// Navigate tree to the last user message entry (sets leaf to its parent, returns text)
+			const result = await this.session.navigateTree(lastUserMsg.entryId);
+			if (result.cancelled) return;
+
+			this.renderCurrentSessionState();
+
+			// Re-submit the same prompt
+			const text = result.editorText ?? lastUserMsg.text;
+			if (text) {
+				await this.session.prompt(text);
+			}
+		} catch (error: unknown) {
+			this.showError(error instanceof Error ? error.message : String(error));
+		}
 	}
 
 	private async handleCompactCommand(customInstructions?: string): Promise<void> {

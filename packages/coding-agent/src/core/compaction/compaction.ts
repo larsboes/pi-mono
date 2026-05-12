@@ -116,12 +116,18 @@ export interface CompactionSettings {
 	enabled: boolean;
 	reserveTokens: number;
 	keepRecentTokens: number;
+	/** Trigger compaction when context tokens exceed this absolute count. Takes priority over thresholdPercent when > 0. */
+	thresholdTokens?: number;
+	/** Trigger compaction when context tokens exceed this percent of contextWindow (1-99). */
+	thresholdPercent?: number;
 }
 
 export const DEFAULT_COMPACTION_SETTINGS: CompactionSettings = {
 	enabled: true,
 	reserveTokens: 16384,
 	keepRecentTokens: 20000,
+	thresholdTokens: -1,
+	thresholdPercent: -1,
 };
 
 // ============================================================================
@@ -217,8 +223,27 @@ export function estimateContextTokens(messages: AgentMessage[]): ContextUsageEst
  * Check if compaction should trigger based on context usage.
  */
 export function shouldCompact(contextTokens: number, contextWindow: number, settings: CompactionSettings): boolean {
-	if (!settings.enabled) return false;
-	return contextTokens > contextWindow - settings.reserveTokens;
+	if (!settings.enabled || contextWindow <= 0) return false;
+	return contextTokens > resolveThresholdTokens(contextWindow, settings);
+}
+
+/**
+ * Compute the effective threshold token count for a given context window + settings.
+ * Priority: thresholdTokens (absolute) > thresholdPercent > contextWindow - reserveTokens.
+ */
+export function resolveThresholdTokens(contextWindow: number, settings: CompactionSettings): number {
+	const thresholdTokens = settings.thresholdTokens;
+	if (typeof thresholdTokens === "number" && Number.isFinite(thresholdTokens) && thresholdTokens > 0) {
+		return Math.min(contextWindow - 1, Math.max(1, thresholdTokens));
+	}
+
+	const thresholdPercent = settings.thresholdPercent;
+	if (typeof thresholdPercent === "number" && Number.isFinite(thresholdPercent) && thresholdPercent > 0) {
+		const clamped = Math.min(99, Math.max(1, thresholdPercent));
+		return Math.floor(contextWindow * (clamped / 100));
+	}
+
+	return contextWindow - settings.reserveTokens;
 }
 
 // ============================================================================
