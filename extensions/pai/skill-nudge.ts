@@ -74,18 +74,41 @@ function extractPackName(repoRoot: string, skillDir: string): string {
 	return rel.split("/")[0] ?? "Other";
 }
 
+/** Scan ~/.pi/agent/skills/ — symlink-deployed skills have SKILL.md at root */
+function findDeployedSkills(skillsDir: string): SkillEntry[] {
+	if (!existsSync(skillsDir)) return [];
+	const results: SkillEntry[] = [];
+	try {
+		for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+			if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+			const skillMd = join(skillsDir, entry.name, "SKILL.md");
+			if (!existsSync(skillMd)) continue;
+			const name = extractName(skillMd) ?? entry.name;
+			results.push({ name, pack: "Other" });
+		}
+	} catch {}
+	return results;
+}
+
 function loadSkills(): SkillEntry[] {
 	if (cache) return cache;
-	if (!existsSync(SOURCES_CONF)) return (cache = []);
 
 	const entries: SkillEntry[] = [];
-	for (const line of readFileSync(SOURCES_CONF, "utf-8").split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith("#")) continue;
-		entries.push(...findSkillEntries(trimmed));
+
+	// 1. sources.conf repos (pai-work DT-private skills, etc.)
+	if (existsSync(SOURCES_CONF)) {
+		for (const line of readFileSync(SOURCES_CONF, "utf-8").split("\n")) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith("#")) continue;
+			entries.push(...findSkillEntries(trimmed));
+		}
 	}
 
-	// Deduplicate by name
+	// 2. ~/.pi/agent/skills/ — symlink-deployed PAI skills (sync-deploy.sh target)
+	const deployedSkillsDir = join(homedir(), ".pi", "agent", "skills");
+	entries.push(...findDeployedSkills(deployedSkillsDir));
+
+	// Deduplicate by name (sources.conf wins over deployed for same name)
 	const seen = new Set<string>();
 	cache = entries.filter(e => {
 		if (seen.has(e.name)) return false;
