@@ -13,14 +13,14 @@ extensions:
     dir: extensions/
     symlinked_to: ~/.pi/agent/extensions/
     repo: https://github.com/larsboes/pi-mono
-  private:
-    # Never referenced here — boundary rule: DT content stays in DT GitLab
-    symlinked_to: ~/.pi/agent/extensions/
-    note: dt-extensions repo on DT GitLab
+  # Private extension repositories (if any) are loaded locally via the
+  # `~/.pi/agent/extensions/` symlink target and are intentionally not
+  # described here — they never leave their origin host.
 
 skills:
   public: ~/Developer/PAI/Packs
-  private: ~/Developer/pai-work/Packs   # DT GitLab only
+  # Additional packs may be loaded locally via ~/.pai/sources.conf — paths and
+  # repository origins for any private packs are kept out of the public fork.
   discovery: ~/.pai/sources.conf
 
 sync:

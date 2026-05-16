@@ -41,9 +41,8 @@ Personal fork of [`earendil-works/pi-mono`](https://github.com/earendil-works/pi
 │    session-index.ts   — Fast JSON session index (16x faster) │
 │    pruning.ts         — Tool output token pruning            │
 │                                                              │
-│  59 PAI Skills (2 packs):                                    │
-│    ~/Developer/PAI/Packs      — 51 skills                    │
-│    ~/Developer/pai-work/Packs — 8 work-specific skills       │
+│  PAI Skills via ~/.pai/sources.conf                          │
+│    ~/Developer/PAI/Packs      — public skill packs           │
 │                                                              │
 │  2 MCP Servers: docker                                       │
 ├─────────────────────────────────────────────────────────────┤
@@ -173,8 +172,9 @@ External skill packs loaded via `skills.customDirectories`:
 
 | Pack | Path | Skills |
 |------|------|--------|
-| PAI Main | `~/Developer/PAI/Packs/` | 51 |
-| PAI Work | `~/Developer/pai-work/Packs/` | 8 (work-specific) |
+| PAI Main | `~/Developer/PAI/Packs/` | public skill packs |
+
+Additional private packs may be loaded locally via `~/.pai/sources.conf` — those repos are not part of pi-mono.
 
 **Categories:**
 - **Thinking:** DeepAnalysis, DeepDebug, Brainstorm, FirstPrinciples, SystemsThinking, RootCauseAnalysis, Science, BeCreative
@@ -186,7 +186,6 @@ External skill packs loaded via `skills.customDirectories`:
 - **Agents:** Delegation, Council, Agents, Prompting, Evals
 - **Web:** Browser, BrightData, Apify, Parser
 - **Meta:** CreateSkill, CreateCLI, PAIUpgrade, Telos
-- **Work-specific:** azure, pptx, and internal tools (separate repo, not in pi-mono)
 
 ---
 
@@ -229,7 +228,6 @@ toolProfile: standard
 skills:
   customDirectories:
     - ~/Developer/PAI/Packs
-    - ~/Developer/pai-work/Packs
 modelRoles:
   default: amazon-bedrock/eu.anthropic.claude-sonnet-4-6
   smol: amazon-bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0

@@ -13,8 +13,11 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { registerSkills } from "./skills.js";
 import { registerSkillNudge } from "./skill-nudge.js";
+import { registerPaiSkill } from "./pai-skill.js";
+import { registerAdvisor } from "./advisor.js";
+import { registerCato } from "./cato.js";
+import { registerDoctrineEnforcer } from "./doctrine-enforcer.js";
 import { registerWorkspaceTree } from "./workspace-tree.js";
 import { registerSearchTools } from "./search-tools.js";
 import { registerAlgorithm, getAlgoState } from "./algorithm.js";
@@ -22,6 +25,9 @@ import { registerISA, buildISAContext } from "./isa.js";
 import { registerSessionLearning } from "./session-learning.js";
 import { registerSecurityGuard } from "./security.js";
 import { registerDream, shouldAutoDream } from "./dream.js";
+import { registerVoice } from "./voice.js";
+import { registerVerification } from "./verification.js";
+import { registerCheckpoint } from "./checkpoint.js";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -596,8 +602,8 @@ function refresh(ctx: ExtensionContext) {
 // ── Extension entry point ────────────────────────────────────────────────────
 
 export default function pai(pi: ExtensionAPI) {
-	// PAI Skills — discover and register skills from sources.conf
-	registerSkills(pi);
+	// PAI Skill — first-class Skill primitive (parity with CC's Skill tool)
+	registerPaiSkill(pi);
 
 	// PAI Skill Nudge — compact skill index in system prompt
 	registerSkillNudge(pi);
@@ -622,6 +628,26 @@ export default function pai(pi: ExtensionAPI) {
 
 	// PAI Dream — periodic self-improvement from execution analysis
 	registerDream(pi);
+
+	// PAI Voice — TTS notifications for Algorithm phase transitions
+	registerVoice(pi);
+
+	// PAI Verification — soft-enforce Inline Verification Mandate on ISC transitions
+	registerVerification(pi);
+
+	// PAI Checkpoint — auto-commit on ISC transitions for repos in ~/.pai/checkpoint-repos.txt
+	registerCheckpoint(pi);
+
+	// PAI Advisor — commitment-boundary second-opinion via subprocess model call
+	registerAdvisor(pi);
+
+	// PAI Cato — cross-vendor audit at E4/E5 via subprocess model call (different provider)
+	registerCato(pi);
+
+	// PAI Doctrine Enforcer — soft-enforce doctrine output format on session model.
+	// User-message prefix at E2+ (strongest channel for non-Anthropic models),
+	// + agent_end compliance check that stages a corrective nudge for next turn.
+	registerDoctrineEnforcer(pi);
 
 	// PAI Statusline — HUD widget + footer status
 	pi.on("session_start", async (event, ctx) => {

@@ -11,7 +11,7 @@ const SOURCES_CONF = join(homedir(), ".pai", "sources.conf");
 
 interface SkillEntry {
 	name: string;
-	pack: string; // e.g. "Tooling", "Thinking", "DTInternal"
+	pack: string; // e.g. "Tooling", "Thinking", "Internal"
 }
 
 let cache: SkillEntry[] | null = null;
@@ -65,7 +65,7 @@ function extractName(skillMd: string): string | null {
 /**
  * Extract pack name from path relative to repo root.
  * ~/Developer/PAI/Packs/Tooling/src/Docker → "Tooling"
- * ~/Developer/pai-work/Packs/DTInternal/src/dt-gitlab → "DTInternal"
+ * ~/Developer/&lt;some-pack-repo&gt;/Packs/Internal/src/some-skill → "Internal"
  */
 function extractPackName(repoRoot: string, skillDir: string): string {
 	const resolved = resolve(expandPath(repoRoot));
@@ -95,7 +95,7 @@ function loadSkills(): SkillEntry[] {
 
 	const entries: SkillEntry[] = [];
 
-	// 1. sources.conf repos (pai-work DT-private skills, etc.)
+	// 1. sources.conf repos (additional locally-loaded skill packs)
 	if (existsSync(SOURCES_CONF)) {
 		for (const line of readFileSync(SOURCES_CONF, "utf-8").split("\n")) {
 			const trimmed = line.trim();
@@ -129,7 +129,7 @@ const PACK_LABELS: Record<string, string> = {
 	Research:   "Research",
 	Security:   "Security",
 	Finance:    "Finance",
-	DTInternal: "DT",
+	Internal:   "Internal",
 };
 
 function buildNudge(skills: SkillEntry[]): string {
