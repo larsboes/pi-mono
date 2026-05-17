@@ -501,7 +501,10 @@ function isAnthropicFamily(modelLabel: string): boolean {
  * Three keywords required for ISC-17: "closed enumeration", "phase-header emoji",
  * "visible response not reasoning".
  */
-function buildModelFamilyHint(modelLabel: string): string {
+function buildModelFamilyHint(modelLabel: string, cwd?: string): string {
+	const cwdLine = cwd
+		? `**Current working directory: \`${cwd}\`.** Resolve every relative path against this. Anchor file lookups here BEFORE running broad \`find\` / \`glob\` searches across the whole filesystem.`
+		: `**Anchor file lookups in the current working directory FIRST** before running broad \`find\` / \`glob\` searches.`;
 	return `
 <pai-non-anthropic-notice priority="high">
 ## Heads-up — non-Anthropic-trained session model
@@ -514,7 +517,9 @@ Your underlying model (\`${modelLabel}\`) is NOT trained on PAI doctrine and his
 
 3. **The doctrine-enforcer scans your VISIBLE RESPONSE, not your reasoning trace.** If you have extended thinking enabled, you may use it freely — but the markers (🎯 INTENT, phase headers, 🏹 CAPABILITIES SELECTED, 📃 SUMMARY block) MUST appear in the visible text the user sees. Markers buried in reasoning do not count and produce a doctrine-format violation.
 
-These three rules are not stylistic. They are how the system measures whether you actually entered the Algorithm. Skipping them leaves \`~/.pai/data/verification-violations.jsonl\` full of evidence that the session model ignored doctrine — and the next prompt will receive a corrective nudge with that evidence inline.
+4. **CWD anchoring + filename disambiguation.** ${cwdLine} When the user names a file with a common name (e.g. \`algorithm.ts\`, \`config.ts\`, \`index.ts\`, \`README.md\`), prefer files inside the current project tree over \`~/.claude/\`, \`~/.pi/\`, \`~/Developer/PAI/\`, or any \`PAI-upstream/Releases/\` archive — UNLESS the user explicitly named one of those paths. If \`find\` returns more than 3 candidates, list them with their parent directory and ASK before reading. Reading the wrong file wastes a 50KB context window and sends the rest of the run off-track.
+
+These four rules are not stylistic. They are how the system measures whether you actually entered the Algorithm. Skipping them leaves \`~/.pai/data/verification-violations.jsonl\` full of evidence that the session model ignored doctrine — and the next prompt will receive a corrective nudge with that evidence inline.
 </pai-non-anthropic-notice>
 `;
 }
@@ -547,7 +552,7 @@ const TIER_SPECS: Record<EffortTier, { budget: string; iscFloor: number; thinkin
  * The full canonical version lives at ~/.claude/PAI/Algorithm/v{LATEST}.md
  * (CC-only) — if present, we point the model at it for deeper reference.
  */
-export function buildAlgorithmContext(tier: EffortTier, modelLabel?: string): string {
+export function buildAlgorithmContext(tier: EffortTier, modelLabel?: string, cwd?: string): string {
 	const spec = TIER_SPECS[tier];
 	const ccVersion = getCanonicalAlgorithmVersion();
 	const referenceLine = ccVersion
@@ -558,7 +563,7 @@ export function buildAlgorithmContext(tier: EffortTier, modelLabel?: string): st
 	// model isn't trained on Claude conventions. Adds ~700 bytes when active,
 	// 0 bytes for Anthropic-family sessions (ISC-18).
 	const familyHint = modelLabel && !isAnthropicFamily(modelLabel)
-		? buildModelFamilyHint(modelLabel)
+		? buildModelFamilyHint(modelLabel, cwd)
 		: "";
 
 	// E1 fast-path — stay light, preserve <90s budget
@@ -821,7 +826,7 @@ export function registerAlgorithm(pi: ExtensionAPI) {
 		const modelLabel = ctx?.model
 			? `${(ctx.model as { provider?: string }).provider ?? ""}/${(ctx.model as { id?: string }).id ?? ""}`
 			: undefined;
-		const algoContext = buildAlgorithmContext(adjustedTier, modelLabel);
+		const algoContext = buildAlgorithmContext(adjustedTier, modelLabel, ctx.cwd);
 		const isaContext = buildISAContext(ctx.cwd) || "";
 		const newPrompt = event.systemPrompt + "\n\n" + algoContext + isaContext;
 
