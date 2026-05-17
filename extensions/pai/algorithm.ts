@@ -606,9 +606,34 @@ ${referenceLine}
    - **D: Research** — search docs before code archaeology on unfamiliar APIs.
 4. **🔁 REPRODUCE-FIRST (blocking if Gate A fired):** capture artifact (curl output, screenshot, stderr, failing test output) BEFORE Read/Grep on suspect path.
 5. **💪🏼 EFFORT:** confirm tier (currently ${tier.toUpperCase()}). Override hierarchy: explicit /eN > classifier > context > auto.
-6. **🏹 CAPABILITIES SELECTED:** name each capability and its target phase. Naming is a binding commitment to invoke it via Skill or tool — text-only is dishonest. **Thinking capability vocabulary is a CLOSED ENUMERATION (use names verbatim):**
+6. **🏹 CAPABILITIES SELECTED:** name each capability and its target phase. Naming is a binding commitment to invoke it via the matching Pi tool — text-only is dishonest. **Thinking capability vocabulary is a CLOSED ENUMERATION (use names verbatim):**
 
-   IterativeDepth, ApertureOscillation, FeedbackMemoryConsult, Advisor, ReReadCheck, FirstPrinciples, SystemsThinking, RootCauseAnalysis, Council, RedTeam, Science, BeCreative, Ideate, BitterPillEngineering, Evals, WorldThreatModel, Fabric patterns, ContextSearch, ISA
+   | Name (verbatim) | How to invoke in this Pi session |
+   |-----------------|----------------------------------|
+   | IterativeDepth | \`pai_skill name="IterativeDepth"\` |
+   | ApertureOscillation | \`pai_skill name="ApertureOscillation"\` |
+   | FeedbackMemoryConsult | grep \`~/.claude/projects/-home-lars/memory/feedback_*.md\` (in-context) |
+   | Advisor | \`advisor_check\` tool |
+   | ReReadCheck | re-read user's last message verbatim before \`phase: complete\` (in-context) |
+   | FirstPrinciples | \`pai_skill name="FirstPrinciples"\` |
+   | SystemsThinking | \`pai_skill name="SystemsThinking"\` |
+   | RootCauseAnalysis | \`pai_skill name="RootCauseAnalysis"\` |
+   | Council | \`pai_skill name="Council"\` |
+   | RedTeam | \`pai_skill name="RedTeam"\` |
+   | Science | \`pai_skill name="Science"\` |
+   | BeCreative | \`pai_skill name="BeCreative"\` |
+   | Ideate | \`pai_skill name="Ideate"\` |
+   | BitterPillEngineering | \`pai_skill name="BitterPillEngineering"\` |
+   | Evals | \`pai_skill name="Evals"\` |
+   | WorldThreatModel | \`pai_skill name="WorldThreatModel"\` |
+   | Fabric patterns | \`pai_skill name="Fabric" args="<pattern>"\` |
+   | ContextSearch | \`pai_skill name="ContextSearch"\` |
+   | ISA | \`isa_scaffold\` / \`isa_mark_isc\` / \`isa_append_decision\` / \`isa_append_changelog\` / \`isa_check_completeness\` |
+
+   Delegation capabilities (auto-include thresholds in parens):
+   - **Forge** (E3+ coding) → \`forge_code\` tool. Cross-vendor code producer (GPT-5.4 by default; Gemini fallback). Use for substantial coding tasks where another vendor's lineage is materially valuable, OR when whole-project context fits Forge's window better than yours.
+   - **Cato** (E4/E5 mandatory) → \`cato_audit\` tool. Cross-vendor read-only audit before \`phase: complete\`.
+   - **Anvil** (no Pi tool yet) — Kimi K2.6 long-context coder. Skip if not present.
 
    Inventing generic labels ("decomposition", "tradeoff analysis", "deep reasoning") is a PHANTOM and does NOT count toward the floor. New names require Algorithm version bump, never ad-hoc invention.
 
@@ -715,6 +740,7 @@ The full v6.3.0 was designed for Claude Code with hooks, the ISA Skill, Forge, C
 - **Skill primitive** → invoke a PAI skill via the \`pai_skill\` tool — pass \`name\` (e.g. "Architecture", "DeepDebug", "Personal/daily") and optional \`args\`. Returns SKILL.md content as tool result. Use this whenever you select a capability from the closed enumeration that has a backing skill.
 - **Advisor (Rule 2)** → \`advisor_check\` Pi tool. Spawns a separate model subprocess with structured prompt — returns verdict + concerns + recommendations.
 - **Cato cross-vendor audit (Rule 2a, E4/E5)** → \`cato_audit\` Pi tool. Spawns a different provider (GPT or Gemini-via-Vertex by default) read-only. Verdict structure: pass | concerns | fail.
+- **Forge code producer (auto-include at E3+ coding tasks)** → \`forge_code\` Pi tool. Spawns a different provider (GPT-5.4 by default; Gemini fallback). Pass concrete \`task\` + \`context_paths\`. Receives unified diff or fenced file blocks back. Sister to Cato — Cato audits, Forge writes.
 - **Mode classifier** → model-call.ts fast role with heuristic fail-safe. Tier source recorded in \`~/.pai/data/algo-feedback.jsonl\` as \`source: classifier|fail-safe|heuristic|explicit\`.
 - **Reflection JSONL** → the Pi extension auto-captures execution metrics in \`~/.pai/data/algo-feedback.jsonl\`; you don't need to write reflections manually.
 

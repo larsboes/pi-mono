@@ -28,6 +28,10 @@ import { registerDream, shouldAutoDream } from "./dream.js";
 import { registerVoice } from "./voice.js";
 import { registerVerification } from "./verification.js";
 import { registerCheckpoint } from "./checkpoint.js";
+import { telosSystemPromptAddition } from "./telos.js";
+import { registerSignals } from "./signals.js";
+import { registerForge } from "./forge.js";
+import { registerApplier } from "./applier.js";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -545,39 +549,10 @@ function buildWidget(ctx: ExtensionContext): string[] {
 	return lines;
 }
 
-// ── TELOS context injection ──────────────────────────────────────────────────
-// Reads $VAULT_PATH/Atlas/TELOS/TELOS.md and prepends it to the system prompt
-// as a <system-reminder>. Mirrors the Claude Code LoadContext hook behavior.
-// VAULT_PATH points at whichever vault this machine uses (work vs personal).
-
-function loadTelosContext(): string | null {
-	const vaultPath = process.env.VAULT_PATH;
-	if (!vaultPath) return null;
-	const telosPath = join(vaultPath, "Atlas/TELOS/TELOS.md");
-	if (!existsSync(telosPath)) {
-		if (process.env.DEBUG) console.error(`[pai] TELOS not found at ${telosPath}`);
-		return null;
-	}
-	try {
-		const content = readFileSync(telosPath, "utf-8").trim();
-		if (process.env.DEBUG) console.error(`[pai] Loaded TELOS from vault (${content.length} chars)`);
-		return content;
-	} catch (err) {
-		if (process.env.DEBUG) console.error(`[pai] Failed to load TELOS: ${err}`);
-		return null;
-	}
-}
-
-// Cache TELOS for the session — read once per pi session, not per turn.
-// Invalidated only on pi restart.
-let cachedTelos: string | null | undefined = undefined;
-
-function telosSystemPromptAddition(existingPrompt: string): string {
-	if (cachedTelos === undefined) cachedTelos = loadTelosContext();
-	if (!cachedTelos) return existingPrompt;
-	const block = `\n\n<system-reminder>\n${cachedTelos}\n</system-reminder>\n`;
-	return existingPrompt + block;
-}
+// TELOS context injection moved to ./telos.ts — loads IDENTITY + SOUL + TELOS
+// + PERSONAL_CONTEXT (mirrors CC's CLAUDE.md @-imports) plus auto-managed
+// soul files (SHADOW, STORY, CORRECTIONS) when present. mtime-keyed cache so
+// mid-session edits are picked up without restart.
 
 // ── Status line (footer) ─────────────────────────────────────────────────────
 
@@ -648,6 +623,20 @@ export default function pai(pi: ExtensionAPI) {
 	// User-message prefix at E2+ (strongest channel for non-Anthropic models),
 	// + agent_end compliance check that stages a corrective nudge for next turn.
 	registerDoctrineEnforcer(pi);
+
+	// PAI Signals — claude-soul-style typed signal extraction on agent_end.
+	// Parses last user+assistant pair for correction / gratitude / confusion /
+	// restart / success markers and emits to ~/.pai/data/signals.jsonl. Feeds
+	// the dream learning loop and the auto-managed CORRECTIONS / SHADOW files.
+	registerSignals(pi);
+
+	// PAI Forge — GPT-5.4 code-producer adapter. Sister to Cato (read-only audit).
+	// Cross-vendor write-mode generation; doctrine auto-includes at E3+ coding tasks.
+	registerForge(pi);
+
+	// PAI Applier — applies dream report proposals (skill scaffold, ISA addendum,
+	// algo-tuning JSON, knowledge entry). Closes the dream→action loop.
+	registerApplier(pi);
 
 	// PAI Statusline — HUD widget + footer status
 	pi.on("session_start", async (event, ctx) => {

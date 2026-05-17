@@ -22,6 +22,10 @@ import {
 	CLOSED_THINKING_LIST,
 } from "../doctrine-parser.js";
 import { buildAlgorithmContext } from "../algorithm.js";
+import { classifySignals } from "../signals.js";
+import { buildTelosContext } from "../telos.js";
+import { buildNudge } from "../skill-nudge.js";
+import { shouldAutoDream } from "../dream.js";
 
 let passed = 0;
 let failed = 0;
@@ -101,6 +105,71 @@ console.log("\n## Model-family hint\n");
 
 console.log("\n## Closed enumeration sanity\n");
 check("19 entries exactly", CLOSED_THINKING_LIST.length === 19);
+
+console.log("\n## Doctrine binds capabilities to invocation\n");
+{
+	const e3 = buildAlgorithmContext("e3", "amazon-bedrock/eu.anthropic.claude-sonnet-4-6");
+	check("doctrine names pai_skill for FirstPrinciples", e3.includes("pai_skill name=\"FirstPrinciples\""));
+	check("doctrine names advisor_check tool", e3.includes("advisor_check"));
+	check("doctrine names cato_audit tool", e3.includes("cato_audit"));
+	check("doctrine names forge_code tool", e3.includes("forge_code"));
+	check("doctrine has invocation table header", /How to invoke in this Pi session/.test(e3));
+}
+
+console.log("\n## Signal extraction (claude-soul-style)\n");
+{
+	const correction = classifySignals("no actually that's wrong, let's start over");
+	const gratitude = classifySignals("perfect, exactly what I wanted");
+	const confusion = classifySignals("what do you mean by that??");
+	const empty = classifySignals("ok");
+	const success = classifySignals("works now, ship it");
+	const frustration = classifySignals("ugh this is still broken");
+
+	check("correction signal fires", correction.some((s) => s.kind === "correction"));
+	check("restart signal fires on 'start over'", correction.some((s) => s.kind === "restart"));
+	check("gratitude fires on perfect/exactly", gratitude.some((s) => s.kind === "gratitude"));
+	check("confusion fires on what-do-you-mean", confusion.some((s) => s.kind === "confusion"));
+	check("very short input ('ok') extracts nothing", empty.length === 0);
+	check("success fires on works/ship", success.some((s) => s.kind === "success"));
+	check("frustration fires on ugh/still-broken", frustration.some((s) => s.kind === "frustration"));
+}
+
+console.log("\n## TELOS multi-file injection\n");
+{
+	const block = buildTelosContext();
+	if (process.env.VAULT_PATH) {
+		// Soft check — only meaningful if vault is present at test time.
+		check("telos block produced when vault present", block.length > 0);
+		check("telos block names IDENTITY", /IDENTITY/.test(block));
+		check("telos block has pai-telos wrapper", block.includes("<pai-telos>") && block.includes("</pai-telos>"));
+	} else {
+		check("telos block empty when VAULT_PATH unset", block === "");
+	}
+}
+
+console.log("\n## BM25 skill ranking\n");
+{
+	const skills = [
+		{ name: "Architecture", pack: "Thinking", description: "Software architecture review", path: "/", useWhen: "review architecture, DDD" },
+		{ name: "MailCraft", pack: "Writing", description: "Compose business emails", path: "/", useWhen: "draft email, compose mail" },
+		{ name: "DeepDebug", pack: "Tooling", description: "Systematic debugging", path: "/", useWhen: "stuck bug debug investigation" },
+	];
+	const nudge = buildNudge("review the architecture of this code", skills, 3);
+	check("skill nudge has closed enumeration", nudge.includes("PAI Algorithm capability invocation"));
+	check("skill nudge ranks Architecture top for arch query", /Architecture/.test(nudge.split("Most relevant")[1] ?? ""));
+	check("skill nudge has Forge in delegation list", nudge.includes("Forge"));
+	check("skill nudge wrapped in <pai-skills>", nudge.startsWith("<pai-skills>") && nudge.endsWith("</pai-skills>"));
+}
+
+console.log("\n## Dream auto-trigger thresholds\n");
+{
+	const decision = shouldAutoDream();
+	// Pure check — depends on local state, but should always return a coherent shape.
+	check("shouldAutoDream returns yes:boolean", typeof decision.yes === "boolean");
+	check("shouldAutoDream returns reason:string", typeof decision.reason === "string" && decision.reason.length > 0);
+	check("shouldAutoDream tier is null when no", decision.yes || decision.tier === null);
+	check("shouldAutoDream tier in [quick|deep|meta] when yes", !decision.yes || ["quick", "deep", "meta"].includes(decision.tier ?? ""));
+}
 
 console.log("\n## Summary\n");
 console.log(`  ${passed} passed, ${failed} failed`);
