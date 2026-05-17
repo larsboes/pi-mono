@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { type AgentMessage, uuidv7 } from "@earendil-works/pi-agent-core";
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { randomUUID } from "crypto";
 import {
@@ -16,7 +16,6 @@ import {
 } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
 import { join, resolve } from "path";
-import { v7 as uuidv7 } from "uuid";
 import { getAgentDir as getDefaultAgentDir, getSessionsDir } from "../config.js";
 import {
 	type BashExecutionMessage,
@@ -646,6 +645,48 @@ function indexedToSessionInfo(indexed: IndexedSession): SessionInfo {
 	};
 }
 
+const MAX_CONCURRENT_SESSION_INFO_LOADS = 10;
+
+async function buildSessionInfosWithConcurrency(
+	files: string[],
+	onLoaded: () => void,
+): Promise<(SessionInfo | null)[]> {
+	const results: (SessionInfo | null)[] = new Array(files.length).fill(null);
+	const inFlight = new Set<Promise<void>>();
+	let nextIndex = 0;
+
+	const startNext = (): void => {
+		const index = nextIndex++;
+		const file = files[index];
+		if (!file) return;
+
+		let task: Promise<void>;
+		task = buildSessionInfo(file)
+			.then((info) => {
+				results[index] = info;
+			})
+			.catch(() => {
+				results[index] = null;
+			})
+			.finally(() => {
+				inFlight.delete(task);
+				onLoaded();
+			});
+		inFlight.add(task);
+	};
+
+	while (nextIndex < files.length || inFlight.size > 0) {
+		while (nextIndex < files.length && inFlight.size < MAX_CONCURRENT_SESSION_INFO_LOADS) {
+			startNext();
+		}
+		if (inFlight.size > 0) {
+			await Promise.race(inFlight);
+		}
+	}
+
+	return results;
+}
+
 /** @deprecated Kept as fallback. Index-based listing is now preferred. */
 async function _listSessionsFromDir(
 	dir: string,
@@ -664,14 +705,10 @@ async function _listSessionsFromDir(
 		const total = progressTotal ?? files.length;
 
 		let loaded = 0;
-		const results = await Promise.all(
-			files.map(async (file) => {
-				const info = await buildSessionInfo(file);
-				loaded++;
-				onProgress?.(progressOffset + loaded, total);
-				return info;
-			}),
-		);
+		const results = await buildSessionInfosWithConcurrency(files, () => {
+			loaded++;
+			onProgress?.(progressOffset + loaded, total);
+		});
 		for (const info of results) {
 			if (info) {
 				sessions.push(info);
